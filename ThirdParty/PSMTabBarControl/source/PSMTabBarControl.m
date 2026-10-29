@@ -1782,7 +1782,7 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
 
 #pragma mark - Pane rows
 
-static const CGFloat PSMPaneRowLeadingIndent = 28;
+static const CGFloat PSMPaneRowLeadingIndent = 44;
 
 - (CGFloat)paneRowFontSize {
     NSNumber *override = [self.delegate tabView:self valueOfOption:PSMTabBarControlOptionFontSizeOverride];
