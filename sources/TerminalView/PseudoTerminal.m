@@ -809,6 +809,10 @@ typedef NS_ENUM(int, iTermShouldHaveTitleSeparator) {
                                                  name:kRefreshTerminalNotification
                                                object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(advancedSettingsDidChange:)
+                                                 name:iTermAdvancedSettingsDidChange
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(scrollerStyleDidChange:)
                                                  name:@"NSPreferredScrollerStyleDidChangeNotification"
                                                object:nil];
@@ -8871,6 +8875,34 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     return YES;
 }
 
+- (NSArray<NSString *> *)tabView:(NSTabView *)aTabView
+        paneTitlesForTabViewItem:(NSTabViewItem *)tabViewItem
+                 activePaneIndex:(NSInteger *)activePaneIndex {
+    if (![iTermAdvancedSettingsModel showSplitPanesInVerticalTabBar]) {
+        return nil;
+    }
+    PTYTab *tab = [PTYTab castFrom:tabViewItem.identifier];
+    // Tree order, not -orderedSessions, which can follow recency and would reshuffle the rows on
+    // every focus change.
+    NSArray<PTYSession *> *sessions = tab.sessions;
+    if (sessions.count < 2) {
+        return nil;
+    }
+    *activePaneIndex = [sessions indexOfObject:tab.activeSession];
+    return [sessions mapWithBlock:^id(PTYSession *session) {
+        return [session.name removingHTMLFromTabTitleIfNeeded];
+    }];
+}
+
+- (void)tabView:(NSTabView *)aTabView didClickPaneAtIndex:(NSInteger)index ofTabViewItem:(NSTabViewItem *)tabViewItem {
+    PTYTab *tab = [PTYTab castFrom:tabViewItem.identifier];
+    NSArray<PTYSession *> *sessions = tab.sessions;
+    if (index < 0 || index >= (NSInteger)sessions.count) {
+        return;
+    }
+    [sessions[index] reveal];
+}
+
 - (NSString *)tabView:(NSTabView *)aTabView toolTipForTabViewItem:(NSTabViewItem *)aTabViewItem {
     if ([iTermAdvancedSettingsModel disableTabBarTooltips]) {
         return nil;
@@ -16313,6 +16345,18 @@ typedef NS_ENUM(NSUInteger, iTermBroadcastCommand) {
     if (tab == self.currentTab) {
         [self updateUseTransparency];
     }
+    [self tabPaneTitlesDidChange:tab];
+}
+
+- (void)tabPaneTitlesDidChange:(PTYTab *)tab {
+    if ([iTermAdvancedSettingsModel showSplitPanesInVerticalTabBar]) {
+        [_contentView.tabBarControl paneTitlesDidChange];
+    }
+}
+
+- (void)advancedSettingsDidChange:(NSNotification *)notification {
+    // Cheap when nothing changed, and also clears pane rows after the setting is turned off.
+    [_contentView.tabBarControl paneTitlesDidChange];
 }
 
 - (void)tabDidInvalidateStatusBar:(PTYTab *)tab {

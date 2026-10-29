@@ -52,6 +52,8 @@ typedef NS_OPTIONS(NSUInteger, PTYTabState) {
 - (void)tabDidChangeMetalViewVisibility:(PTYTab *)tab;
 - (BOOL)tabShouldUseTransparency:(PTYTab *)tab;
 - (void)numberOfSessionsDidChangeInTab:(PTYTab *)tab;
+// A pane's name or the tab's active pane changed.
+- (void)tabPaneTitlesDidChange:(PTYTab *)tab;
 - (BOOL)tabAnyDragInProgress:(PTYTab *)tab;
 - (void)tabDidInvalidateStatusBar:(PTYTab *)tab;
 - (iTermVariables *)tabWindowVariables:(PTYTab *)tab;

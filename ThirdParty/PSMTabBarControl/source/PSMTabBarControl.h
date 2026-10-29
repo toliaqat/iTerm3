@@ -169,6 +169,15 @@ extern PSMTabBarControlOptionKey PSMTabBarControlOptionPUAFontProvider;  // id<P
 //tooltips
 - (nullable NSString *)tabView:(NSTabView *)aTabView toolTipForTabViewItem:(NSTabViewItem *)tabViewItem;
 
+// Split-pane rows in a vertical tab bar. Return the titles of the panes to list beneath the tab, or
+// nil to list none, and set *activePaneIndex to the focused pane's index. Call
+// -paneTitlesDidChange when the answer changes.
+- (nullable NSArray<NSString *> *)tabView:(NSTabView *)aTabView
+                 paneTitlesForTabViewItem:(NSTabViewItem *)tabViewItem
+                          activePaneIndex:(NSInteger *)activePaneIndex;
+// A click on the pane row at `index` beneath `tabViewItem`.
+- (void)tabView:(NSTabView *)aTabView didClickPaneAtIndex:(NSInteger)index ofTabViewItem:(NSTabViewItem *)tabViewItem;
+
 //accessibility
 - (NSString *)accessibilityStringForTabView:(NSTabView *)aTabView objectCount:(int)objectCount;
 
@@ -492,6 +501,16 @@ extern const CGFloat PSMTabBarProgressBarHeight;
 // Re-asks the delegate whether to show activity indicators and updates the
 // cells if the answer changed.
 - (void)updateActivityIndicators;
+
+// Re-asks the delegate for every tab's split-pane rows (vertical bars only) and relays out if any
+// changed.
+- (void)paneTitlesDidChange;
+// Height of a tab cell's slot in a vertical bar: one row for the tab plus one per pane row.
+- (CGFloat)verticalSlotHeightForCell:(PSMTabBarCell *)cell;
+// The tab cell whose pane row contains `point`, or nil. Sets *paneIndex to the row's index.
+- (nullable PSMTabBarCell *)cellForPaneRowAtPoint:(NSPoint)point paneIndex:(nullable NSInteger *)paneIndex;
+// Frame of the pane row at `index` beneath `cell`.
+- (NSRect)frameOfPaneRowAtIndex:(NSInteger)index ofCell:(PSMTabBarCell *)cell;
 
 // Safely remove a cell.
 - (void)removeCell:(PSMTabBarCell *)cell;

@@ -94,6 +94,11 @@
 @property(nonatomic) PSMProgress progress;
 @property(nonatomic) BOOL isProcessing;
 @property(nonatomic, assign) BOOL isPinned;
+// Titles of the split panes a vertical tab bar lists beneath this tab, from the delegate's
+// -tabView:paneTitlesForTabViewItem:activePaneIndex:. nil when the tab shows no pane rows.
+@property(nonatomic, copy) NSArray<NSString *> *paneTitles;
+// Index into paneTitles of the focused pane.
+@property(nonatomic, assign) NSInteger activePaneIndex;
 
 // creation/destruction
 - (id)initWithControlView:(PSMTabBarControl *)controlView;

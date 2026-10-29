@@ -749,7 +749,7 @@ static const NSTimeInterval PSMTabBarSpringLoadingDelay = 0.6;
         if (lastCell.isInOverflowMenu) {
             return YES;
         }
-        const CGFloat maxY = NSMaxY(lastCell.frame);
+        const CGFloat maxY = NSMinY(lastCell.frame) + [self verticalSlotHeightForCell:lastCell];
         return point.y < maxY;
     }
 }
@@ -1639,6 +1639,7 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
               clipRect:rect
             horizontal:horizontalFlag
           withOverflow:_lainOutWithOverflow];
+    [self drawPaneRows];
     if (needClip) {
         [NSGraphicsContext restoreGraphicsState];
     }
@@ -1770,6 +1771,136 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
 // variable widths, so there is no equivalent.)
 - (CGFloat)verticalCellHeight {
     return [self genericCellRectWithOverflow:_showAddTabButton].size.height;
+}
+
+#pragma mark - Pane rows
+
+static const CGFloat PSMPaneRowLeadingIndent = 28;
+
+- (CGFloat)paneRowFontSize {
+    NSNumber *override = [self.delegate tabView:self valueOfOption:PSMTabBarControlOptionFontSizeOverride];
+    return override ? override.doubleValue : 11.0;
+}
+
+- (CGFloat)paneRowHeight {
+    return MAX(18.0, ceil([self paneRowFontSize] + 9.0));
+}
+
+- (BOOL)cellShowsPaneRows:(PSMTabBarCell *)cell {
+    return (cell.paneTitles.count > 0 &&
+            [self isVerticalOrientation] &&
+            !cell.isTabGroupChip &&
+            !cell.isPlaceholder &&
+            !cell.isCollapsedHidden);
+}
+
+- (CGFloat)verticalSlotHeightForCell:(PSMTabBarCell *)cell {
+    const CGFloat tabHeight = [self verticalCellHeight];
+    if (![self cellShowsPaneRows:cell]) {
+        return tabHeight;
+    }
+    return tabHeight + [self paneRowHeight] * (CGFloat)cell.paneTitles.count;
+}
+
+- (NSRect)frameOfPaneRowAtIndex:(NSInteger)index ofCell:(PSMTabBarCell *)cell {
+    // Styles may inset a cell horizontally but never move it vertically, so the cell's top is the
+    // top of its slot.
+    const CGFloat rowHeight = [self paneRowHeight];
+    return NSMakeRect(NSMinX(cell.frame),
+                      NSMinY(cell.frame) + [self verticalCellHeight] + rowHeight * (CGFloat)index,
+                      NSWidth(cell.frame),
+                      rowHeight);
+}
+
+- (PSMTabBarCell *)cellForPaneRowAtPoint:(NSPoint)point paneIndex:(NSInteger *)paneIndex {
+    if (![self isVerticalOrientation] || [[PSMTabDragAssistant sharedDragAssistant] isDragging]) {
+        return nil;
+    }
+    for (PSMTabBarCell *cell in _cells) {
+        if (![self cellShowsPaneRows:cell] || ![self cellIsDrawnInBar:cell]) {
+            continue;
+        }
+        for (NSInteger i = 0; i < (NSInteger)cell.paneTitles.count; i++) {
+            if (NSPointInRect(point, [self frameOfPaneRowAtIndex:i ofCell:cell])) {
+                if (paneIndex) {
+                    *paneIndex = i;
+                }
+                return cell;
+            }
+        }
+    }
+    return nil;
+}
+
+// Asks the delegate for each tab's pane rows. Returns YES if any tab's row count changed, which
+// changes the layout; a change only of titles or the focused pane just needs a redraw.
+- (BOOL)refreshPaneTitles {
+    const BOOL wanted = ([self isVerticalOrientation] &&
+                         [self.delegate respondsToSelector:@selector(tabView:paneTitlesForTabViewItem:activePaneIndex:)]);
+    BOOL layoutChanged = NO;
+    for (PSMTabBarCell *cell in _cells) {
+        NSArray<NSString *> *titles = nil;
+        NSInteger activeIndex = NSNotFound;
+        if (wanted && !cell.isTabGroupChip && !cell.isPlaceholder && cell.representedObject) {
+            titles = [self.delegate tabView:_tabView
+                   paneTitlesForTabViewItem:cell.representedObject
+                            activePaneIndex:&activeIndex];
+        }
+        if (titles.count == 0) {
+            titles = nil;
+        }
+        if (titles.count != cell.paneTitles.count) {
+            layoutChanged = YES;
+        }
+        cell.paneTitles = titles;
+        cell.activePaneIndex = activeIndex;
+    }
+    return layoutChanged;
+}
+
+- (void)paneTitlesDidChange {
+    if ([self refreshPaneTitles]) {
+        [self update:NO];
+    }
+    [self setNeedsDisplay:YES];
+}
+
+- (void)drawPaneRows {
+    if (![self isVerticalOrientation] || [[PSMTabDragAssistant sharedDragAssistant] isDragging]) {
+        return;
+    }
+    const BOOL mainAndActive = self.window.isMainWindow && NSApp.isActive;
+    NSColor *textColor = [_style textColorDefaultSelected:NO
+                                          backgroundColor:nil
+                               windowIsMainAndAppIsActive:mainAndActive];
+    NSFont *font = [NSFont systemFontOfSize:[self paneRowFontSize]];
+    NSMutableParagraphStyle *paragraphStyle = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    paragraphStyle.lineBreakMode = NSLineBreakByTruncatingTail;
+    NSDictionary *inactiveAttributes = @{ NSFontAttributeName: font,
+                                          NSForegroundColorAttributeName: [textColor colorWithAlphaComponent:0.6],
+                                          NSParagraphStyleAttributeName: paragraphStyle };
+    NSDictionary *activeAttributes = @{ NSFontAttributeName: font,
+                                        NSForegroundColorAttributeName: textColor,
+                                        NSParagraphStyleAttributeName: paragraphStyle };
+    const CGFloat trailingMargin = 8;
+    for (PSMTabBarCell *cell in _cells) {
+        if (![self cellShowsPaneRows:cell] || ![self cellIsDrawnInBar:cell]) {
+            continue;
+        }
+        for (NSInteger i = 0; i < (NSInteger)cell.paneTitles.count; i++) {
+            const NSRect row = [self frameOfPaneRowAtIndex:i ofCell:cell];
+            NSDictionary *attributes = (i == cell.activePaneIndex) ? activeAttributes : inactiveAttributes;
+            NSAttributedString *title = [[[NSAttributedString alloc] initWithString:cell.paneTitles[i]
+                                                                         attributes:attributes] autorelease];
+            const CGFloat textHeight = ceil(title.size.height);
+            const NSRect textRect = NSMakeRect(NSMinX(row) + PSMPaneRowLeadingIndent,
+                                               NSMinY(row) + floor((NSHeight(row) - textHeight) / 2.0),
+                                               MAX(0, NSWidth(row) - PSMPaneRowLeadingIndent - trailingMargin),
+                                               textHeight);
+            [title drawWithRect:textRect
+                        options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingTruncatesLastVisibleLine];
+        }
+    }
 }
 
 // How far you can scroll before the last tab reaches the trailing edge; 0 when everything fits.
@@ -2025,6 +2156,7 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
         [cell updateHighlight];
         [cell updateIndicators];
     }
+    [self refreshPaneTitles];
 
     // Calculate number of cells to fit in the control and cell widths.
     const NSInteger cellCount = [_cells count];
@@ -2091,8 +2223,6 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
             return;
         }
         CGFloat currentOrigin = [[self style] topMarginForTabBarControl];
-        NSRect cellRect = [self genericCellRectWithOverflow:(NO || _showAddTabButton)];
-        const CGFloat tabHeight = cellRect.size.height;
         NSMutableArray *newOrigins = [NSMutableArray arrayWithCapacity:cellCount];
 
         if ([self tabBarIsScrollable]) {
@@ -2105,7 +2235,7 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
                 if (cell.isCollapsedHidden) {
                     continue;  // hidden by a collapsed group: no height
                 }
-                totalHeight += cell.isTabGroupChip ? [self heightOfTabGroupChipCell:cell] : tabHeight;
+                totalHeight += cell.isTabGroupChip ? [self heightOfTabGroupChipCell:cell] : [self verticalSlotHeightForCell:cell];
             }
             _scrollContentExtent = [[self style] topMarginForTabBarControl] + totalHeight;
             [self clampScrollOffset];
@@ -2115,7 +2245,7 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
                 if (_cells[i].isCollapsedHidden) {
                     continue;  // zero height: keep this origin but don't advance
                 }
-                currentOrigin += _cells[i].isTabGroupChip ? [self heightOfTabGroupChipCell:_cells[i]] : tabHeight;
+                currentOrigin += _cells[i].isTabGroupChip ? [self heightOfTabGroupChipCell:_cells[i]] : [self verticalSlotHeightForCell:_cells[i]];
             }
         } else {
             for (int i = 0; i < cellCount; ++i) {
@@ -2124,7 +2254,7 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
                     [newOrigins addObject:@(currentOrigin)];
                     continue;
                 }
-                const CGFloat h = _cells[i].isTabGroupChip ? [self heightOfTabGroupChipCell:_cells[i]] : tabHeight;
+                const CGFloat h = _cells[i].isTabGroupChip ? [self heightOfTabGroupChipCell:_cells[i]] : [self verticalSlotHeightForCell:_cells[i]];
                 if (currentOrigin + h <= [self frame].size.height) {
                     [newOrigins addObject:@(currentOrigin)];
                     currentOrigin += h;
@@ -2467,7 +2597,7 @@ static CGFloat PSMCollapseEase(CGFloat t) {
     NSMutableArray<NSNumber *> *start = [NSMutableArray arrayWithCapacity:_cells.count];
     NSMutableArray<NSNumber *> *target = [NSMutableArray arrayWithCapacity:_cells.count];
     for (PSMTabBarCell *cell in _cells) {
-        const CGFloat fullSlot = cell.isTabGroupChip ? [self heightOfTabGroupChipCell:cell] : tabHeight;
+        const CGFloat fullSlot = cell.isTabGroupChip ? [self heightOfTabGroupChipCell:cell] : [self verticalSlotHeightForCell:cell];
         [start addObject:@((NSHeight(cell.frame) > 0) ? fullSlot : 0.0)];
         [target addObject:@(cell.isCollapsedHidden ? 0.0 : fullSlot)];
     }
@@ -2510,12 +2640,14 @@ static CGFloat PSMCollapseEase(CGFloat t) {
     _scrollContentExtent = [[self style] topMarginForTabBarControl] + total;
     [self clampScrollOffset];
     CGFloat origin = [[self style] topMarginForTabBarControl] - _scrollOffset;
+    const CGFloat rowHeight = [self verticalCellHeight];
     for (NSInteger i = 0; i < n; i++) {
         const CGFloat slot = slots[i].doubleValue;
         // Advance by the full slot (matching the settled layout), but draw the
         // cell one divider-gap shorter, so the settled frames are reproduced
-        // exactly at the end and static cells never move.
-        const CGFloat drawnH = MAX(0.0, slot - _collapseVerticalGap);
+        // exactly at the end and static cells never move. A slot taller than one
+        // row holds pane rows, which are drawn below the cell, not by it.
+        const CGFloat drawnH = MAX(0.0, MIN(slot, rowHeight) - _collapseVerticalGap);
         [_cells[i] setFrame:NSMakeRect(_collapseVerticalCellX, origin, _collapseVerticalCellWidth, drawnH)];
         origin += slot;
     }
@@ -3907,6 +4039,25 @@ typedef struct {
 
 - (void)handleMouseUp:(NSEvent * _Nonnull)theEvent {
     const NSPoint clickPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
+
+    // A pane row is not a tab: a click there focuses that pane, and no other click on it (such as
+    // the double-click that would otherwise open a new tab over empty bar) does anything.
+    NSInteger upPaneIndex = NSNotFound;
+    PSMTabBarCell *upPaneCell = [self cellForPaneRowAtPoint:clickPoint paneIndex:&upPaneIndex];
+    if (upPaneCell) {
+        NSInteger downPaneIndex = NSNotFound;
+        PSMTabBarCell *downPaneCell =
+            [self cellForPaneRowAtPoint:[self convertPoint:[[self lastMouseDownEvent] locationInWindow] fromView:nil]
+                              paneIndex:&downPaneIndex];
+        if (theEvent.clickCount == 1 &&
+            downPaneCell == upPaneCell &&
+            downPaneIndex == upPaneIndex &&
+            [self.delegate respondsToSelector:@selector(tabView:didClickPaneAtIndex:ofTabViewItem:)]) {
+            [self.delegate tabView:_tabView didClickPaneAtIndex:upPaneIndex ofTabViewItem:upPaneCell.representedObject];
+        }
+        return;
+    }
+
     NSRect cellFrame;
     PSMTabBarCell *const cell = [self cellForPoint:clickPoint cellFrame:&cellFrame];
 

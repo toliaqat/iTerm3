@@ -944,6 +944,7 @@ static void SetAgainstGrainDim(BOOL isVertical, NSSize *dest, CGFloat value) {
     if ([self activeSession] == session) {
         [self updateTabTitleForCurrentSessionName:newName];
     }
+    [_delegate tabPaneTitlesDidChange:self];
 }
 
 - (void)updateTabTitleForCurrentSessionName:(NSString *)newName {
@@ -1095,6 +1096,7 @@ static void SetAgainstGrainDim(BOOL isVertical, NSSize *dest, CGFloat value) {
             [[realParentWindow_ window] makeFirstResponder:[session mainResponder]];
         }
         [realParentWindow_ setDimmingForSessions];
+        [_delegate tabPaneTitlesDidChange:self];
         // The active pane in this tab changed, so the focused session may have
         // changed. Stamp it (coalesced) for cross-window Open Quickly MRU. Not
         // gated on updateActivityCounter: even cmd-[/] navigation moves focus,
