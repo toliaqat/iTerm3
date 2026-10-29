@@ -831,7 +831,7 @@ static void iTermPreferencesRefreshFastCachesForKey(NSString *key);
                   kPreferenceKeyTabStyle_Deprecated: @(TAB_STYLE_LIGHT),
                   kPreferenceKeyTabStyle: @(TAB_STYLE_LIGHT),
                   
-                  kPreferenceKeyTabPosition: @(TAB_POSITION_TOP),
+                  kPreferenceKeyTabPosition: @(TAB_POSITION_LEFT),
                   kPreferenceKeyStatusBarPosition: @(iTermStatusBarPositionTop),
                   kPreferenceKeyTopBottomMargins: @2,
                   kPreferenceKeySideMargins: @5,
