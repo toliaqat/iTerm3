@@ -1894,6 +1894,20 @@ static const CGFloat PSMPaneRowLeadingIndent = 28;
     [self setNeedsDisplay:YES];
 }
 
+// Fills the active pane row of the selected tab with the same background as the selected tab itself.
+- (void)drawSelectedBackgroundForPaneRow:(NSRect)row ofCell:(PSMTabBarCell *)cell {
+    if ([_style isKindOfClass:[PSMYosemiteTabStyle class]]) {
+        [(PSMYosemiteTabStyle *)_style drawCellBackgroundSelected:YES
+                                                           inRect:row
+                                                     withTabColor:cell.tabColor
+                                                  highlightAmount:0
+                                                       horizontal:NO];
+        return;
+    }
+    [[_style backgroundColorSelected:YES highlightAmount:0] set];
+    NSRectFillUsingOperation(row, NSCompositingOperationSourceOver);
+}
+
 - (void)drawPaneRows {
     if (![self isVerticalOrientation]) {
         return;
@@ -1916,9 +1930,16 @@ static const CGFloat PSMPaneRowLeadingIndent = 28;
         if (![self paneRowsAreVisibleForCell:cell]) {
             continue;
         }
+        const BOOL cellSelected = (cell.state == NSControlStateValueOn);
         for (NSInteger i = 0; i < (NSInteger)cell.paneTitles.count; i++) {
             const NSRect row = [self frameOfPaneRowAtIndex:i ofCell:cell];
             NSDictionary *attributes = (i == cell.activePaneIndex) ? activeAttributes : inactiveAttributes;
+            if (cellSelected && i == cell.activePaneIndex) {
+                [self drawSelectedBackgroundForPaneRow:row ofCell:cell];
+                NSMutableDictionary *selectedAttributes = [[attributes mutableCopy] autorelease];
+                selectedAttributes[NSForegroundColorAttributeName] = [_style textColorForCell:cell];
+                attributes = selectedAttributes;
+            }
             NSAttributedString *title = [[[NSAttributedString alloc] initWithString:cell.paneTitles[i]
                                                                          attributes:attributes] autorelease];
             const CGFloat textHeight = ceil(title.size.height);
