@@ -679,6 +679,13 @@
                       withTabColor:(NSColor *)tabColor
                    highlightAmount:(CGFloat)highlightAmount
                         horizontal:(BOOL)horizontal {
+    if (!horizontal) {
+        [self drawVerticalCellBackgroundSelected:selected
+                                          inRect:cellFrame
+                                    withTabColor:tabColor
+                                 highlightAmount:highlightAmount];
+        return;
+    }
     [[self backgroundColorSelected:selected highlightAmount:highlightAmount] set];
     NSRect backgroundRect = cellFrame;
     NSEdgeInsets backgroundInsets = [self backgroundInsetsWithHorizontalOrientation:horizontal];
@@ -708,6 +715,45 @@
 - (NSEdgeInsets)backgroundInsetsWithHorizontalOrientation:(BOOL)horizontal {
     NSEdgeInsets insets = NSEdgeInsetsZero;
     return insets;
+}
+
+// A vertical bar draws its rows like a modern sidebar: the row keeps the
+// unselected background, and selection (or a tab color) is a rounded pill.
+- (void)drawVerticalCellBackgroundSelected:(BOOL)selected
+                                    inRect:(NSRect)cellFrame
+                              withTabColor:(NSColor *)tabColor
+                           highlightAmount:(CGFloat)highlightAmount {
+    [[self backgroundColorSelected:NO highlightAmount:selected ? 0 : highlightAmount] set];
+    NSRect backgroundRect = cellFrame;
+    // The bar background color is extended by a half point to get a two-tone
+    // effect with the right-side line but here we want to remove it completely.
+    backgroundRect.size.width += 0.5;
+    NSRectFillUsingOperation(backgroundRect, NSCompositingOperationSourceOver);
+    if (selected || tabColor) {
+        [self drawVerticalSelectionPillInRect:cellFrame
+                                     selected:selected
+                                 withTabColor:tabColor
+                              highlightAmount:highlightAmount];
+    }
+}
+
+- (void)drawVerticalSelectionPillInRect:(NSRect)rect
+                               selected:(BOOL)selected
+                           withTabColor:(NSColor *)tabColor
+                        highlightAmount:(CGFloat)highlightAmount {
+    const NSRect pillRect = NSInsetRect(rect, 6, 1.5);
+    if (NSWidth(pillRect) <= 0 || NSHeight(pillRect) <= 0) {
+        return;
+    }
+    NSBezierPath *pill = [NSBezierPath bezierPathWithRoundedRect:pillRect xRadius:6 yRadius:6];
+    if (selected) {
+        [[self backgroundColorSelected:YES highlightAmount:highlightAmount] set];
+        [pill fill];
+    }
+    if (tabColor) {
+        [[self cellBackgroundColorForTabColor:tabColor selected:selected] set];
+        [pill fill];
+    }
 }
 
 
@@ -747,14 +793,9 @@
         // Top line
         [[self topLineColorSelected:selected] set];
         // Bottom line
-    } else {
-        // Bottom line
-        [[self verticalLineColorSelected:selected] set];
-        const NSEdgeInsets insets = [self insetsForTabBarDividers];
-        cellFrame.origin.x += insets.left;
-        cellFrame.size.width -= (insets.left + insets.right);
-        [self drawHorizontalLineInFrame:cellFrame y:NSMaxY(cellFrame) - 1];
     }
+    // A vertical bar has no separators between rows; the selection pill and
+    // spacing separate them.
 }
 
 - (NSEdgeInsets)insetsForTabBarDividers {
@@ -1380,6 +1421,54 @@ static const CGFloat kPSMSquaredCollapsedChevron = 14;  // room for the collapse
     return [color psmContrastingTextColor];
 }
 
+- (BOOL)barIsDark:(PSMTabBarControl *)bar {
+    NSAppearanceName name = [bar.effectiveAppearance bestMatchFromAppearancesWithNames:@[ NSAppearanceNameAqua,
+                                                                                          NSAppearanceNameDarkAqua ]];
+    return [name isEqualToString:NSAppearanceNameDarkAqua];
+}
+
+// The group color as text/strokes on the bar (vertical bar): the color itself
+// on a dark bar, a darker shade on a light one so it stays readable.
+- (NSColor *)tabGroupAccentColorForColor:(NSColor *)color inBar:(PSMTabBarControl *)bar {
+    NSColor *srgb = [color colorUsingColorSpace:[NSColorSpace sRGBColorSpace]] ?: color;
+    if ([self barIsDark:bar]) {
+        return [srgb blendedColorWithFraction:0.15 ofColor:[NSColor whiteColor]] ?: srgb;
+    }
+    return [srgb blendedColorWithFraction:0.3 ofColor:[NSColor blackColor]] ?: srgb;
+}
+
+// Rounded, lightly tinted header block for a group on a vertical bar.
+- (void)drawVerticalTabGroupHeaderInRect:(NSRect)rect
+                                   color:(NSColor *)groupColor
+                                   label:(NSString *)label
+                           trailingSpace:(CGFloat)trailingSpace
+                                   inBar:(PSMTabBarControl *)bar {
+    const NSRect header = NSInsetRect(rect, 4, 2);
+    if (NSWidth(header) <= 0 || NSHeight(header) <= 0) {
+        return;
+    }
+    const BOOL dark = [self barIsDark:bar];
+    [[groupColor colorWithAlphaComponent:dark ? 0.22 : 0.16] set];
+    [[NSBezierPath bezierPathWithRoundedRect:header xRadius:6 yRadius:6] fill];
+
+    if (label.length == 0) {
+        return;
+    }
+    NSFont *font = [NSFont systemFontOfSize:[self squaredGroupNameFont].pointSize weight:NSFontWeightSemibold];
+    NSMutableParagraphStyle *para = [[NSMutableParagraphStyle alloc] init];
+    para.lineBreakMode = NSLineBreakByTruncatingTail;
+    NSDictionary *attrs = @{ NSFontAttributeName: font,
+                             NSForegroundColorAttributeName: [self tabGroupAccentColorForColor:groupColor inBar:bar],
+                             NSParagraphStyleAttributeName: para };
+    const CGFloat textHeight = ceil(font.ascender - font.descender);
+    const CGFloat pad = kPSMSquaredGroupNamePad - 2;
+    NSRect textRect = NSMakeRect(NSMinX(header) + pad,
+                                 NSMidY(header) - textHeight / 2.0,
+                                 MAX(0, NSWidth(header) - pad * 2 - trailingSpace),
+                                 textHeight);
+    [label drawInRect:textRect withAttributes:attrs];
+}
+
 - (void)drawTabGroupRunDecorationsForTabBar:(PSMTabBarControl *)bar clipRect:(NSRect)clipRect {
     if (![self usesExternalTabGroupDecoration] || bar.suppressTabGroupRunDecoration) {
         return;
@@ -1470,6 +1559,39 @@ static const CGFloat kPSMSquaredCollapsedChevron = 14;  // room for the collapse
         box.size.width = MAX(0, NSWidth(box) - 1);
     }
     if (NSWidth(box) <= 0 || NSHeight(box) <= 0) {
+        return;
+    }
+
+    if (bar.orientation != PSMTabBarHorizontalOrientation) {
+        NSString *label = [self collapsedLabelForName:name count:count];
+        // Leave room for the chevron and, on a project, its + button.
+        [self drawVerticalTabGroupHeaderInRect:box
+                                         color:groupColor
+                                         label:label
+                                 trailingSpace:kPSMSquaredCollapsedChevron + 26
+                                         inBar:bar];
+        if (count > 0) {
+            NSColor *accent = [self tabGroupAccentColorForColor:groupColor inBar:bar];
+            const CGFloat cx = NSMaxX(box) - kPSMSquaredGroupNamePad - kPSMSquaredCollapsedChevron / 2.0;
+            const CGFloat cy = NSMidY(box);
+            const CGFloat half = 3;
+            // Pointing right (collapsed), like a sidebar disclosure triangle.
+            NSBezierPath *chevron = [NSBezierPath bezierPath];
+            [chevron moveToPoint:NSMakePoint(cx - half / 2.0, cy - half)];
+            [chevron lineToPoint:NSMakePoint(cx + half / 2.0, cy)];
+            [chevron lineToPoint:NSMakePoint(cx - half / 2.0, cy + half)];
+            chevron.lineWidth = 1.5;
+            chevron.lineCapStyle = NSLineCapStyleRound;
+            chevron.lineJoinStyle = NSLineJoinStyleRound;
+            [accent setStroke];
+            [chevron stroke];
+        }
+        if (isDropTarget) {
+            [[NSColor controlAccentColor] setStroke];
+            NSBezierPath *frame = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(box, 3, 1) xRadius:7 yRadius:7];
+            frame.lineWidth = 2;
+            [frame stroke];
+        }
         return;
     }
 
@@ -1582,6 +1704,26 @@ static const CGFloat kPSMSquaredCollapsedChevron = 14;  // room for the collapse
     } else {
         solid = NSMakeRect(NSMinX(box), NSMinY(box),
                            NSWidth(box), MAX(0, NSMinY(firstVis) - NSMinY(box)));
+    }
+
+    if (!horizontal) {
+        // The header excludes the gap down to the first tab.
+        NSRect headerRect = solid;
+        headerRect.size.height = MAX(0, NSHeight(solid) - kPSMSquaredGroupBArea);
+        [self drawVerticalTabGroupHeaderInRect:headerRect
+                                         color:groupColor
+                                         label:name
+                                 trailingSpace:26
+                                         inBar:bar];
+        // A thin rail along the members' leading edge marks the group's extent.
+        const CGFloat railTop = NSMinY(firstVis) + 3;
+        const CGFloat railBottom = NSMaxY(tabsRect) - 3;
+        if (railBottom > railTop) {
+            NSRect rail = NSMakeRect(NSMinX(box) + 2, railTop, 2.5, railBottom - railTop);
+            [[self tabGroupAccentColorForColor:groupColor inBar:bar] set];
+            [[NSBezierPath bezierPathWithRoundedRect:rail xRadius:1.25 yRadius:1.25] fill];
+        }
+        return;
     }
 
     // Solid group-color block for the name and the colored area up to the tab.

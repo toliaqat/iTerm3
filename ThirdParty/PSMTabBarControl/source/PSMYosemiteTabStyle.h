@@ -56,6 +56,15 @@ int DebugLogImpl(const char *file, int line, const char *function, NSString* val
                                                selected:(BOOL)selected
                                         highlightAmount:(CGFloat)highlightAmount
                                                  window:(NSWindow * _Nullable)window;
+// Rounded selection/tab-color pill used for rows on a vertical bar.
+- (void)drawVerticalSelectionPillInRect:(NSRect)rect
+                               selected:(BOOL)selected
+                           withTabColor:(NSColor *)tabColor
+                        highlightAmount:(CGFloat)highlightAmount;
+
+// The group color as text/strokes on a vertical bar.
+- (NSColor *)tabGroupAccentColorForColor:(NSColor *)color inBar:(PSMTabBarControl *)bar;
+
 - (void)drawCellBackgroundSelected:(BOOL)selected
                             inRect:(NSRect)cellFrame
                       withTabColor:(NSColor * _Nullable)tabColor

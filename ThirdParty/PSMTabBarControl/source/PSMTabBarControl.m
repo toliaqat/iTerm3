@@ -1900,11 +1900,10 @@ static const CGFloat PSMPaneRowLeadingIndent = 44;
 // Fills the active pane row of the selected tab with the same background as the selected tab itself.
 - (void)drawSelectedBackgroundForPaneRow:(NSRect)row ofCell:(PSMTabBarCell *)cell {
     if ([_style isKindOfClass:[PSMYosemiteTabStyle class]]) {
-        [(PSMYosemiteTabStyle *)_style drawCellBackgroundSelected:YES
-                                                           inRect:row
-                                                     withTabColor:cell.tabColor
-                                                  highlightAmount:0
-                                                       horizontal:NO];
+        [(PSMYosemiteTabStyle *)_style drawVerticalSelectionPillInRect:row
+                                                              selected:YES
+                                                          withTabColor:cell.tabColor
+                                                       highlightAmount:0];
         return;
     }
     [[_style backgroundColorSelected:YES highlightAmount:0] set];
@@ -5562,7 +5561,10 @@ static NSRect PSMRunUnionRect(NSRect a, NSRect b) {
             continue;
         }
         id<PSMTabGroup> group = [self.tabGroupDataSource tabGroupWithIdentifier:chip.tabGroupIdentifier];
-        NSColor *color = [(group.color ?: [NSColor systemBlueColor]) psmContrastingTextColor];
+        NSColor *groupColor = group.color ?: [NSColor systemBlueColor];
+        NSColor *color = [_style respondsToSelector:@selector(tabGroupAccentColorForColor:inBar:)]
+            ? [(id)_style tabGroupAccentColorForColor:groupColor inBar:self]
+            : [groupColor psmContrastingTextColor];
         const CGFloat half = 4;
         NSBezierPath *plus = [NSBezierPath bezierPath];
         [plus moveToPoint:NSMakePoint(NSMidX(rect) - half, NSMidY(rect))];

@@ -9681,10 +9681,13 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         palette = [@[
-            [NSColor systemBlueColor], [NSColor systemGreenColor],
-            [NSColor systemOrangeColor], [NSColor systemPurpleColor],
-            [NSColor systemRedColor], [NSColor colorFromHexString:@"#50afbc"],
-            [NSColor systemPinkColor],
+            [NSColor colorFromHexString:@"#5b8def"],  // blue
+            [NSColor colorFromHexString:@"#9b7bea"],  // violet
+            [NSColor colorFromHexString:@"#3fb68b"],  // green
+            [NSColor colorFromHexString:@"#e5a13a"],  // amber
+            [NSColor colorFromHexString:@"#3ab0c9"],  // cyan
+            [NSColor colorFromHexString:@"#e06c75"],  // rose
+            [NSColor colorFromHexString:@"#d9779f"],  // pink
         ] retain];
     });
     NSUInteger index = [self tabGroupsInWindow].count % palette.count;
