@@ -209,6 +209,8 @@ static const NSTimeInterval PSMTabBarSpringLoadingDelay = 0.6;
     // one), in points. 0 means the first tab is at the leading edge. Only meaningful when the
     // scrollable tab bar is enabled; otherwise tabs that don't fit go into the overflow menu.
     CGFloat _scrollOffset;
+    // Height of pane rows scrolled above the viewport, as of the last layout outside a drag.
+    CGFloat _paneRowsHeightAboveViewport;
 
     // End of the last layout walk along the scroll axis (leading margin + total tab extent), cached by
     // reallyUpdate: so maximumScrollOffset works with variable-width horizontal cells.
@@ -1744,6 +1746,11 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
 
 // Scroll position along the scroll axis (y for a vertical bar, x for a horizontal one), in points.
 - (CGFloat)scrollOffset {
+    if ([self isVerticalOrientation] && [[PSMTabDragAssistant sharedDragAssistant] isDragging]) {
+        // A drag hides pane rows and stacks cells by their one-row frames. Take out the rows that
+        // were scrolled past so the same tabs stay in view.
+        return MAX(0, _scrollOffset - _paneRowsHeightAboveViewport);
+    }
     return _scrollOffset;
 }
 
@@ -1786,12 +1793,37 @@ static const CGFloat PSMPaneRowLeadingIndent = 28;
     return MAX(18.0, ceil([self paneRowFontSize] + 9.0));
 }
 
+// Height of the pane rows beneath a tab, whether or not its group is collapsed.
+- (CGFloat)paneRowsHeightForCell:(PSMTabBarCell *)cell {
+    if (cell.paneTitles.count == 0 ||
+        ![self isVerticalOrientation] ||
+        cell.isTabGroupChip ||
+        cell.isPlaceholder) {
+        return 0;
+    }
+    return [self paneRowHeight] * (CGFloat)cell.paneTitles.count;
+}
+
 - (BOOL)cellShowsPaneRows:(PSMTabBarCell *)cell {
-    return (cell.paneTitles.count > 0 &&
-            [self isVerticalOrientation] &&
-            !cell.isTabGroupChip &&
-            !cell.isPlaceholder &&
-            !cell.isCollapsedHidden);
+    return [self paneRowsHeightForCell:cell] > 0 && !cell.isCollapsedHidden;
+}
+
+// Pane rows are drawn and clickable only when the cell sits in its settled slot. A drag lays cells
+// out back to back by frame height, and a collapse slide grows or shrinks a cell's slot, so rows
+// would overlap their neighbors then.
+- (BOOL)paneRowsAreVisibleForCell:(PSMTabBarCell *)cell {
+    if (![self cellShowsPaneRows:cell] ||
+        ![self cellIsDrawnInBar:cell] ||
+        [[PSMTabDragAssistant sharedDragAssistant] isDragging]) {
+        return NO;
+    }
+    if (_collapseAnimating) {
+        const NSUInteger i = [_cells indexOfObjectIdenticalTo:cell];
+        return (i < _collapseStartWidths.count &&
+                i < _collapseTargetWidths.count &&
+                [_collapseStartWidths[i] isEqual:_collapseTargetWidths[i]]);
+    }
+    return YES;
 }
 
 - (CGFloat)verticalSlotHeightForCell:(PSMTabBarCell *)cell {
@@ -1799,7 +1831,7 @@ static const CGFloat PSMPaneRowLeadingIndent = 28;
     if (![self cellShowsPaneRows:cell]) {
         return tabHeight;
     }
-    return tabHeight + [self paneRowHeight] * (CGFloat)cell.paneTitles.count;
+    return tabHeight + [self paneRowsHeightForCell:cell];
 }
 
 - (NSRect)frameOfPaneRowAtIndex:(NSInteger)index ofCell:(PSMTabBarCell *)cell {
@@ -1813,11 +1845,8 @@ static const CGFloat PSMPaneRowLeadingIndent = 28;
 }
 
 - (PSMTabBarCell *)cellForPaneRowAtPoint:(NSPoint)point paneIndex:(NSInteger *)paneIndex {
-    if (![self isVerticalOrientation] || [[PSMTabDragAssistant sharedDragAssistant] isDragging]) {
-        return nil;
-    }
     for (PSMTabBarCell *cell in _cells) {
-        if (![self cellShowsPaneRows:cell] || ![self cellIsDrawnInBar:cell]) {
+        if (![self paneRowsAreVisibleForCell:cell]) {
             continue;
         }
         for (NSInteger i = 0; i < (NSInteger)cell.paneTitles.count; i++) {
@@ -1866,7 +1895,7 @@ static const CGFloat PSMPaneRowLeadingIndent = 28;
 }
 
 - (void)drawPaneRows {
-    if (![self isVerticalOrientation] || [[PSMTabDragAssistant sharedDragAssistant] isDragging]) {
+    if (![self isVerticalOrientation]) {
         return;
     }
     const BOOL mainAndActive = self.window.isMainWindow && NSApp.isActive;
@@ -1884,7 +1913,7 @@ static const CGFloat PSMPaneRowLeadingIndent = 28;
                                         NSParagraphStyleAttributeName: paragraphStyle };
     const CGFloat trailingMargin = 8;
     for (PSMTabBarCell *cell in _cells) {
-        if (![self cellShowsPaneRows:cell] || ![self cellIsDrawnInBar:cell]) {
+        if (![self paneRowsAreVisibleForCell:cell]) {
             continue;
         }
         for (NSInteger i = 0; i < (NSInteger)cell.paneTitles.count; i++) {
@@ -1989,7 +2018,9 @@ static const CGFloat PSMPaneRowLeadingIndent = 28;
     const NSRect frame = [[_cells objectAtIndex:index] frame];
     // The on-screen leading edge is (contentPos - offset), so contentPos = frame's leading edge + offset.
     const CGFloat contentPos = (vertical ? NSMinY(frame) : NSMinX(frame)) + _scrollOffset;
-    const CGFloat cellLength = (vertical ? NSHeight(frame) : NSWidth(frame));
+    const CGFloat cellLength = (vertical
+                                ? NSHeight(frame) + [self paneRowsHeightForCell:_cells[index]]
+                                : NSWidth(frame));
     const CGFloat leadingMargin = [self scrollLeadingMargin];
     const CGFloat viewportLength = [self scrollViewportLength];
 
@@ -2240,12 +2271,22 @@ static const CGFloat PSMPaneRowLeadingIndent = 28;
             _scrollContentExtent = [[self style] topMarginForTabBarControl] + totalHeight;
             [self clampScrollOffset];
             currentOrigin -= _scrollOffset;
+            const CGFloat topMargin = [[self style] topMarginForTabBarControl];
+            const CGFloat tabHeight = [self verticalCellHeight];
+            CGFloat paneRowsAboveViewport = 0;
             for (int i = 0; i < cellCount; ++i) {
                 [newOrigins addObject:@(currentOrigin)];
                 if (_cells[i].isCollapsedHidden) {
                     continue;  // zero height: keep this origin but don't advance
                 }
+                if (!_cells[i].isTabGroupChip) {
+                    const CGFloat rowsHeight = [self verticalSlotHeightForCell:_cells[i]] - tabHeight;
+                    paneRowsAboveViewport += MAX(0, MIN(rowsHeight, topMargin - (currentOrigin + tabHeight)));
+                }
                 currentOrigin += _cells[i].isTabGroupChip ? [self heightOfTabGroupChipCell:_cells[i]] : [self verticalSlotHeightForCell:_cells[i]];
+            }
+            if (![[PSMTabDragAssistant sharedDragAssistant] isDragging]) {
+                _paneRowsHeightAboveViewport = paneRowsAboveViewport;
             }
         } else {
             for (int i = 0; i < cellCount; ++i) {
@@ -2597,7 +2638,11 @@ static CGFloat PSMCollapseEase(CGFloat t) {
     NSMutableArray<NSNumber *> *start = [NSMutableArray arrayWithCapacity:_cells.count];
     NSMutableArray<NSNumber *> *target = [NSMutableArray arrayWithCapacity:_cells.count];
     for (PSMTabBarCell *cell in _cells) {
-        const CGFloat fullSlot = cell.isTabGroupChip ? [self heightOfTabGroupChipCell:cell] : [self verticalSlotHeightForCell:cell];
+        // Not -verticalSlotHeightForCell:, which already reflects the new collapsed state, so a
+        // collapsing tab's start slot would lose its pane rows and the cells below would jump.
+        const CGFloat fullSlot = (cell.isTabGroupChip
+                                  ? [self heightOfTabGroupChipCell:cell]
+                                  : tabHeight + [self paneRowsHeightForCell:cell]);
         [start addObject:@((NSHeight(cell.frame) > 0) ? fullSlot : 0.0)];
         [target addObject:@(cell.isCollapsedHidden ? 0.0 : fullSlot)];
     }
@@ -5207,7 +5252,12 @@ static NSRect PSMRunUnionRect(NSRect a, NSRect b) {
                                                             NSString *))block {
     NSArray<PSMTabBarCell *> *cells = [self cells];
     NSRect (^rect)(PSMTabBarCell *) = rectForCell ?: ^NSRect(PSMTabBarCell *c) {
-        return c.frame;
+        // Enclose a tab's pane rows, which are drawn below its frame.
+        NSRect frame = c.frame;
+        if ([self paneRowsAreVisibleForCell:c]) {
+            frame.size.height += [self paneRowsHeightForCell:c];
+        }
+        return frame;
     };
     for (NSInteger i = 0; i < (NSInteger)cells.count; i++) {
         PSMTabBarCell *chip = cells[i];

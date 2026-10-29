@@ -2328,10 +2328,12 @@ static void SetAgainstGrainDim(BOOL isVertical, NSSize *dest, CGFloat value) {
 
 - (NSArray<PTYSession *> *)tiledSessions {
     if (idMap_) {
-        NSArray<SessionView *> *sessionViews = [idMap_ allValues];
-        NSMutableArray* result = [NSMutableArray arrayWithCapacity:[sessionViews count]];
-        for (SessionView* sessionView in sessionViews) {
-            PTYSession *session = [self sessionForSessionView:sessionView];
+        // Keys are assigned in tree order (see -arrangementConstructingIdMap:), so sort them to keep
+        // the unmaximized order instead of the dictionary's hash order.
+        NSArray<NSNumber *> *keys = [[idMap_ allKeys] sortedArrayUsingSelector:@selector(compare:)];
+        NSMutableArray* result = [NSMutableArray arrayWithCapacity:[keys count]];
+        for (NSNumber *key in keys) {
+            PTYSession *session = [self sessionForSessionView:idMap_[key]];
             if (session) {
                 [result addObject:session];
             }
@@ -7749,6 +7751,8 @@ typedef struct {
     // instead of being stranded on the old one.
     [session1Tab updateAggregatedTabStatus];
     [session2Tab updateAggregatedTabStatus];
+    [session1Tab.delegate tabPaneTitlesDidChange:session1Tab];
+    [session2Tab.delegate tabPaneTitlesDidChange:session2Tab];
 }
 
 - (void)_recursivePopulateSplitTreeNode:(ITMSplitTreeNode *)node
