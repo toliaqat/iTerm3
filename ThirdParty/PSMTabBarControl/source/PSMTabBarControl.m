@@ -211,6 +211,7 @@ static const NSTimeInterval PSMTabBarSpringLoadingDelay = 0.6;
     CGFloat _scrollOffset;
     // Height of pane rows scrolled above the viewport, as of the last layout outside a drag.
     CGFloat _paneRowsHeightAboveViewport;
+    NSArray<NSString *> *_emptyTabGroupIdentifiers;
 
     // End of the last layout walk along the scroll axis (leading margin + total tab extent), cached by
     // reallyUpdate: so maximumScrollOffset works with variable-width horizontal cells.
@@ -449,6 +450,7 @@ static const NSTimeInterval PSMTabBarSpringLoadingDelay = 0.6;
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(springLoadingTimerDidFire)
                                                object:nil];
+    [_emptyTabGroupIdentifiers release];
 
 
     // Remove bindings.
@@ -1642,6 +1644,7 @@ static CAShapeLayer *PSMMaskShapeForPath(NSBezierPath *path, NSRect subviewFrame
             horizontal:horizontalFlag
           withOverflow:_lainOutWithOverflow];
     [self drawPaneRows];
+    [self drawTabGroupAddButtons];
     if (needClip) {
         [NSGraphicsContext restoreGraphicsState];
     }
@@ -4177,6 +4180,13 @@ typedef struct {
     if (cell == nil && !_didDrag && theEvent.clickCount == 1) {
         PSMTabBarCell *downChip = [self chipForPoint:trackingStartPoint];
         PSMTabBarCell *upChip = [self chipForPoint:clickPoint];
+        const NSRect addRect = [self addButtonRectForTabGroupChip:upChip];
+        if (downChip != nil && downChip == upChip &&
+            NSPointInRect(clickPoint, addRect) && NSPointInRect(trackingStartPoint, addRect) &&
+            [[self delegate] respondsToSelector:@selector(tabView:newTabInTabGroup:)]) {
+            [[self delegate] tabView:_tabView newTabInTabGroup:upChip.tabGroupIdentifier];
+            return;
+        }
         if (downChip != nil && downChip == upChip &&
             upChip.tabGroupIdentifier.length > 0 &&
             [[self delegate] respondsToSelector:@selector(tabView:toggleCollapseOfTabGroup:)]) {
@@ -4847,7 +4857,11 @@ static CFAbsoluteTime gDragMoveFirstTime = 0;
     PSMTabBarCell *chip = [self chipForPoint:point];
     if (chip) {
         id<PSMTabGroup> group = [self.tabGroupDataSource tabGroupWithIdentifier:chip.tabGroupIdentifier];
-        return group.name.length > 0 ? group.name : @"";
+        NSString *name = group.name.length > 0 ? group.name : @"";
+        if ([group respondsToSelector:@selector(projectPath)] && group.projectPath.length > 0) {
+            return [NSString stringWithFormat:@"%@\n%@", name, [group.projectPath stringByAbbreviatingWithTildeInPath]];
+        }
+        return name;
     }
 
     if ([[self delegate] respondsToSelector:@selector(tabView:toolTipForTabViewItem:)]) {
@@ -5401,6 +5415,7 @@ static NSRect PSMRunUnionRect(NSRect a, NSRect b) {
     }
     NSArray<PSMTabBarCell *> *normalized =
         [PSMTabBarControl cellsByInsertingTabGroupChipsInto:tabCells controlView:self];
+    normalized = [self cellsByAppendingEmptyTabGroupChipsTo:normalized];
     if ([normalized isEqualToArray:_cells]) {
         return;
     }
@@ -5446,6 +5461,118 @@ static NSRect PSMRunUnionRect(NSRect a, NSRect b) {
             [chip setFrame:frame];
             break;
         }
+    }
+}
+
+// Appends a chip for each empty group, reusing the chip it already has so its
+// frame survives (a fresh chip would draw at a zero frame until the next layout).
+- (NSArray<PSMTabBarCell *> *)cellsByAppendingEmptyTabGroupChipsTo:(NSArray<PSMTabBarCell *> *)cells {
+    if (_emptyTabGroupIdentifiers.count == 0) {
+        return cells;
+    }
+    NSMutableSet<NSString *> *groupsWithMembers = [NSMutableSet set];
+    for (PSMTabBarCell *cell in cells) {
+        if (!cell.isTabGroupChip && cell.tabGroupIdentifier.length > 0) {
+            [groupsWithMembers addObject:cell.tabGroupIdentifier];
+        }
+    }
+    NSMutableArray<PSMTabBarCell *> *result = [[cells mutableCopy] autorelease];
+    for (NSString *gid in _emptyTabGroupIdentifiers) {
+        if ([groupsWithMembers containsObject:gid]) {
+            continue;
+        }
+        PSMTabBarCell *chip = nil;
+        for (PSMTabBarCell *existing in _cells) {
+            if (existing.isTabGroupChip && [existing.tabGroupIdentifier isEqualToString:gid]) {
+                chip = existing;
+                break;
+            }
+        }
+        if (!chip) {
+            chip = [[[PSMTabBarCell alloc] initWithControlView:self] autorelease];
+            [chip setIsTabGroupChip:YES];
+            [chip setTabGroupIdentifier:gid];
+        }
+        [result addObject:chip];
+    }
+    return result;
+}
+
+- (void)setEmptyTabGroupIdentifiers:(NSArray<NSString *> *)identifiers {
+    identifiers = identifiers ?: @[];
+    if ([_emptyTabGroupIdentifiers isEqualToArray:identifiers]) {
+        return;
+    }
+    [_emptyTabGroupIdentifiers release];
+    _emptyTabGroupIdentifiers = [identifiers copy];
+    if ([[PSMTabDragAssistant sharedDragAssistant] isDragging]) {
+        // The drag re-derives chips itself; -finishDrag normalizes again.
+        return;
+    }
+    [self normalizeTabGroupChipCells];
+    [self update:NO];
+}
+
+- (void)enumerateEmptyTabGroupChipsWithBlock:(void (NS_NOESCAPE ^)(PSMTabBarCell *chip,
+                                                                   NSString *groupID))block {
+    for (NSInteger i = 0; i < (NSInteger)_cells.count; i++) {
+        PSMTabBarCell *chip = _cells[i];
+        if (!chip.isTabGroupChip || chip.tabGroupIdentifier.length == 0 || ![self cellIsDrawnInBar:chip]) {
+            continue;
+        }
+        if ([self tabGroupRunAfterChipAtIndex:i].memberCount == 0) {
+            block(chip, chip.tabGroupIdentifier);
+        }
+    }
+}
+
+- (BOOL)tabGroupIsProject:(NSString *)gid {
+    id<PSMTabGroup> group = [self.tabGroupDataSource tabGroupWithIdentifier:gid];
+    return [group respondsToSelector:@selector(projectPath)] && group.projectPath.length > 0;
+}
+
+- (NSRect)addButtonRectForTabGroupChip:(PSMTabBarCell *)chip {
+    // Only a vertical bar's chip spans the bar width with room for a button.
+    if (_orientation == PSMTabBarHorizontalOrientation) {
+        return NSZeroRect;
+    }
+    if (!chip.isTabGroupChip || ![self cellIsDrawnInBar:chip] || ![self tabGroupIsProject:chip.tabGroupIdentifier]) {
+        return NSZeroRect;
+    }
+    const NSRect frame = chip.frame;
+    if (NSWidth(frame) <= 0 || NSHeight(frame) <= 0) {
+        return NSZeroRect;
+    }
+    const NSInteger index = [_cells indexOfObject:chip];
+    const PSMTabGroupRun run = [self tabGroupRunAfterChipAtIndex:index];
+    // A collapsed chip draws its chevron at the trailing edge; sit to its left.
+    const CGFloat chevronAllowance = (run.memberCount > 0 && run.allCollapsed) ? 24 : 0;
+    const CGFloat side = MIN(NSHeight(frame), 22);
+    const CGFloat x = NSMaxX(frame) - 2 - chevronAllowance - side;
+    if (x < NSMinX(frame)) {
+        return NSZeroRect;
+    }
+    return NSMakeRect(x, NSMidY(frame) - side / 2.0, side, side);
+}
+
+- (void)drawTabGroupAddButtons {
+    for (PSMTabBarCell *chip in _cells) {
+        const NSRect rect = [self addButtonRectForTabGroupChip:chip];
+        if (NSIsEmptyRect(rect)) {
+            continue;
+        }
+        id<PSMTabGroup> group = [self.tabGroupDataSource tabGroupWithIdentifier:chip.tabGroupIdentifier];
+        NSColor *color = [(group.color ?: [NSColor systemBlueColor]) psmContrastingTextColor];
+        const CGFloat half = 4;
+        NSBezierPath *plus = [NSBezierPath bezierPath];
+        [plus moveToPoint:NSMakePoint(NSMidX(rect) - half, NSMidY(rect))];
+        [plus lineToPoint:NSMakePoint(NSMidX(rect) + half, NSMidY(rect))];
+        [plus moveToPoint:NSMakePoint(NSMidX(rect), NSMidY(rect) - half)];
+        [plus lineToPoint:NSMakePoint(NSMidX(rect), NSMidY(rect) + half)];
+        plus.lineWidth = 1.5;
+        plus.lineCapStyle = NSLineCapStyleRound;
+        [color setStroke];
+        [plus stroke];
     }
 }
 

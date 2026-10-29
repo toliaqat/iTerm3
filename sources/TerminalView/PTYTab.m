@@ -102,6 +102,7 @@ static NSString* TAB_ARRANGEMENT_GROUP_ID = @"Tab Group ID";
 static NSString* TAB_ARRANGEMENT_GROUP_NAME = @"Tab Group Name";
 static NSString* TAB_ARRANGEMENT_GROUP_COLOR = @"Tab Group Color";
 static NSString* TAB_ARRANGEMENT_GROUP_COLLAPSED = @"Tab Group Collapsed";
+static NSString* TAB_ARRANGEMENT_GROUP_PROJECT_PATH = @"Tab Group Project Path";
 
 // Floating panes are an additive sibling of the tiled tree. Older builds ignore them.
 NSString *const TAB_ARRANGEMENT_FLOATING_PANES = @"Floating Panes";  // array, back to front
@@ -531,6 +532,7 @@ static void SetAgainstGrainDim(BOOL isVertical, NSSize *dest, CGFloat value) {
             [self setParentWindow:parentWindow];
         }
         session.delegate = self;
+        _pendingProjectAutoJoin = YES;
         [root_ addSubview:[session view]];
         [self.viewToSessionMap setObject:session forKey:session.view];
         PtyLog(@"PTYTab initWithSession - end %p", self);
@@ -4480,6 +4482,7 @@ static void SetAgainstGrainDim(BOOL isVertical, NSSize *dest, CGFloat value) {
         theTab.tabGroupColor = [groupColorDict colorValue];
     }
     theTab.tabGroupCollapsed = [arrangement[TAB_ARRANGEMENT_GROUP_COLLAPSED] boolValue];
+    theTab.tabGroupProjectPath = [arrangement[TAB_ARRANGEMENT_GROUP_PROJECT_PATH] nilIfNull];
     NSString *guid = arrangement[TAB_GUID];
     if (guid) {
         if ([[iTermController sharedInstance] tabWithGUID:guid] ||
@@ -4831,6 +4834,9 @@ NSString *const PTYTabArrangementOptionsPendingJumps = @"PTYTabArrangementOption
             encoder[TAB_ARRANGEMENT_GROUP_COLOR] = self.tabGroupColor.dictionaryValue;
         }
         encoder[TAB_ARRANGEMENT_GROUP_COLLAPSED] = @(self.tabGroupCollapsed);
+        if (self.tabGroupProjectPath) {
+            encoder[TAB_ARRANGEMENT_GROUP_PROJECT_PATH] = self.tabGroupProjectPath;
+        }
     }
     // If in screenshot mode, encode the live session instead of the synthetic one
     PTYSession *sessionToEncode = self.activeSession;
@@ -9288,6 +9294,9 @@ typedef struct {
 - (void)sessionCurrentDirectoryDidChange:(PTYSession *)session {
     if (session == self.activeSession) {
         [_delegate tabInvalidateProxyIcon:self];
+    }
+    if (_pendingProjectAutoJoin) {
+        [_delegate tab:self sessionCurrentDirectoryDidChange:session];
     }
 }
 

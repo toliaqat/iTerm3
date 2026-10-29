@@ -120,6 +120,12 @@ typedef NS_ENUM(NSInteger, iTermHiddenFloatingPanesActivity) {
 // Meaningful only when tabGroupID is non-nil.
 @property (nonatomic, copy) NSString *tabGroupName;
 @property (nonatomic, copy) NSColor *tabGroupColor;
+// Folder of the project this tab's group represents, or nil for a plain group.
+// Part of the group definition, so it rides every member like name/color.
+@property (nonatomic, copy) NSString *tabGroupProjectPath;
+// YES for a newly created tab until its first working directory is known. At
+// that point it joins the matching project, if any, and is never auto-moved again.
+@property (nonatomic) BOOL pendingProjectAutoJoin;
 // Whether this tab's group is collapsed (its members are hidden in the tab bar
 // but remain in the NSTabView). Like name/color it rides every member of the
 // group; the invariant "the active tab is never in a collapsed group" is

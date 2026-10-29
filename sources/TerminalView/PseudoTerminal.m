@@ -183,6 +183,7 @@ NSString *const TERMINAL_ARRANGEMENT_WIDTH = @"Width";
 NSString *const TERMINAL_ARRANGEMENT_HEIGHT = @"Height";
 NSString *const TERMINAL_ARRANGEMENT_EDGE_SPANNING_OFF = @"Edge Spanning Off";  // Deprecated. Included in window type now.
 NSString *const TERMINAL_ARRANGEMENT_TABS = @"Tabs";
+static NSString *const TERMINAL_ARRANGEMENT_PROJECTS = @"Projects";
 NSString *const TERMINAL_ARRANGEMENT_FULLSCREEN = @"Fullscreen";
 NSString *const TERMINAL_ARRANGEMENT_LION_FULLSCREEN = @"LionFullscreen";
 NSString *const TERMINAL_ARRANGEMENT_WINDOW_TYPE = @"Window Type";
@@ -303,6 +304,11 @@ typedef NS_ENUM(int, iTermShouldHaveTitleSeparator) {
     // settles. A counter (not a BOOL) so nested suppressions compose; manage it
     // only via -performWithTabGroupAutoExpandSuppressed: so it is exception-safe.
     NSInteger _tabGroupAutoExpandSuppressionCount;
+
+    // Projects (folder-backed tab groups) known to this window, including ones
+    // with no member tabs, which keep showing their chip. Member tabs still
+    // carry the definition; this mirrors it so an empty project survives.
+    NSMutableArray<iTermTabGroup *> *_projects;
 
     ////////////////////////////////////////////////////////////////////////////
     // Instant Replay
@@ -1115,6 +1121,7 @@ ITERM_WEAKLY_REFERENCEABLE
         [[iTermController sharedInstance] setCurrentTerminal:nil];
     }
     [self cleanUpTabColorPicker];
+    [_projects release];
     [_broadcastInputHelper release];
     [_windowPositioner release];
     [_locationLockController release];
@@ -4264,6 +4271,7 @@ typedef NS_ENUM(NSInteger, iTermCloseSubject) {
 
     hidingToolbeltShouldResizeWindow_ = [arrangement[TERMINAL_ARRANGEMENT_HIDING_TOOLBELT_SHOULD_RESIZE_WINDOW] boolValue];
     hidingToolbeltShouldResizeWindowInitialized_ = YES;
+    [self restoreProjectsFromArrangement:arrangement[TERMINAL_ARRANGEMENT_PROJECTS]];
 
     if (arrangement[TERMINAL_ARRANGEMENT_SCROLLER_WIDTH]) {
         const CGFloat savedWidth = [arrangement[TERMINAL_ARRANGEMENT_SCROLLER_WIDTH] doubleValue];
@@ -4592,7 +4600,7 @@ typedef NS_ENUM(NSInteger, iTermCloseSubject) {
                         encoder:(id<iTermEncoderAdapter>)result {
     NSRect rect = [[self window] frame];
 
-    return [PseudoTerminal populateArrangementWith:tabsOrSession
+    const BOOL ok = [PseudoTerminal populateArrangementWith:tabsOrSession
                                  includingContents:includeContents
                                            encoder:result
                                       terminalGuid:self.terminalGuid
@@ -4620,6 +4628,18 @@ typedef NS_ENUM(NSInteger, iTermCloseSubject) {
                                                tab:nil
                                        profileGuid:[[[[iTermHotKeyController sharedInstance] profileHotKeyForWindowController:self] profile] objectForKey:KEY_GUID]
                                        isMaximized:[self isMaximized]];
+    // Only a whole-window arrangement owns the window's projects.
+    __block BOOL wholeWindow = NO;
+    [tabsOrSession whenFirst:^(NSArray<PTYTab *> *tabs) {
+        wholeWindow = (tabs.count == self.tabs.count);
+    } second:nil];
+    if (ok && wholeWindow) {
+        NSArray *projects = [self projectsArrangement];
+        if (projects.count > 0) {
+            result[TERMINAL_ARRANGEMENT_PROJECTS] = projects;
+        }
+    }
+    return ok;
 }
 
 + (BOOL)populateArrangementWith:(iTermOr<NSArray<PTYTab *> *, PTYSession *> *)tabsOrSession
@@ -9055,12 +9075,18 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     }
     for (PTYTab *aTab in [self tabs]) {
         if ([aTab.tabGroupID isEqualToString:identifier]) {
-            return [[[iTermTabGroup alloc] initWithUniqueIdentifier:identifier
-                                                               name:(aTab.tabGroupName ?: @"")
-                                                              color:(aTab.tabGroupColor ?: [NSColor systemBlueColor])] autorelease];
+            return [self tabGroupDefinedByTab:aTab];
         }
     }
-    return nil;
+    return [self projectWithID:identifier];
+}
+
+// The definition of `aTab`'s group, as carried by that tab.
+- (iTermTabGroup *)tabGroupDefinedByTab:(PTYTab *)aTab {
+    return [[[iTermTabGroup alloc] initWithUniqueIdentifier:aTab.tabGroupID
+                                                       name:(aTab.tabGroupName ?: @"")
+                                                      color:(aTab.tabGroupColor ?: [NSColor systemBlueColor])
+                                                projectPath:aTab.tabGroupProjectPath] autorelease];
 }
 
 // Push each tab's group membership to the tab bar. The window controller is
@@ -9092,6 +9118,267 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     }
     [control setTabGroupIdentifiers:identifiers forTabViewItems:items];
     [control setTabGroupCollapsedFlags:collapsedFlags forTabViewItems:items];
+    [self syncProjectsFromTabs];
+    NSMutableArray<NSString *> *emptyProjectIDs = [NSMutableArray array];
+    for (iTermTabGroup *project in _projects) {
+        if ([self tabsInGroup:project.uniqueIdentifier].count == 0) {
+            [emptyProjectIDs addObject:project.uniqueIdentifier];
+        }
+    }
+    [control setEmptyTabGroupIdentifiers:emptyProjectIDs];
+}
+
+#pragma mark - Projects
+
+- (iTermTabGroup *)projectWithID:(NSString *)groupID {
+    if (groupID.length == 0) {
+        return nil;
+    }
+    for (iTermTabGroup *project in _projects) {
+        if ([project.uniqueIdentifier isEqualToString:groupID]) {
+            return project;
+        }
+    }
+    return nil;
+}
+
+// Member tabs carry the authoritative definition (renames and recolors land on
+// them), so refresh the registry from them and add any project it lacks, e.g.
+// one restored with its tabs or moved in from another window.
+- (void)syncProjectsFromTabs {
+    for (iTermTabGroup *group in [self tabGroupsInWindow]) {
+        if (group.projectPath.length == 0) {
+            continue;
+        }
+        if (!_projects) {
+            _projects = [[NSMutableArray alloc] init];
+        }
+        const NSUInteger i = [_projects indexOfObjectPassingTest:^BOOL(iTermTabGroup *p, NSUInteger idx, BOOL *stop) {
+            return [p.uniqueIdentifier isEqualToString:group.uniqueIdentifier];
+        }];
+        if (i == NSNotFound) {
+            [_projects addObject:group];
+        } else {
+            _projects[i] = group;
+        }
+    }
+}
+
+// The project whose folder most specifically contains `directory`, or nil.
+- (iTermTabGroup *)projectContainingDirectory:(NSString *)directory {
+    NSString *dir = [directory stringByStandardizingPath];
+    if (dir.length == 0) {
+        return nil;
+    }
+    iTermTabGroup *best = nil;
+    NSUInteger bestLength = 0;
+    for (iTermTabGroup *project in _projects) {
+        NSString *root = [project.projectPath stringByStandardizingPath];
+        if (root.length == 0) {
+            continue;
+        }
+        NSString *rootWithSlash = [root hasSuffix:@"/"] ? root : [root stringByAppendingString:@"/"];
+        const BOOL contains = [dir isEqualToString:root] || [dir hasPrefix:rootWithSlash];
+        if (contains && root.length > bestLength) {
+            best = project;
+            bestLength = root.length;
+        }
+    }
+    return best;
+}
+
+// PTYTabDelegate: a new tab learned its first working directory. Put it in
+// the project for that folder, once; after that the user decides.
+- (void)tab:(PTYTab *)tab sessionCurrentDirectoryDidChange:(PTYSession *)session {
+    if (!tab.pendingProjectAutoJoin) {
+        return;
+    }
+    NSString *dir = session.currentLocalWorkingDirectory;
+    if (dir.length == 0) {
+        return;
+    }
+    tab.pendingProjectAutoJoin = NO;
+    if (tab.tabGroupID.length > 0) {
+        return;
+    }
+    iTermTabGroup *project = [self projectContainingDirectory:dir];
+    if (!project) {
+        return;
+    }
+    RLog(@"tabGroup: tab %@ auto-joins project %@ (%@)", tab, project.uniqueIdentifier, project.projectPath);
+    tab.tabGroupID = project.uniqueIdentifier;
+    [self finalizeTabGroupMembershipChangeForTab:tab];
+}
+
+- (void)addTabToNewProjectFromFolder:(id)sender {
+    PTYTab *theTab = [[sender representedObject] identifier];
+    NSString *dir = theTab.activeSession.currentLocalWorkingDirectory;
+    if (!theTab || dir.length == 0) {
+        return;
+    }
+    [self addTab:theTab toProjectAtPath:dir];
+}
+
+- (void)addTabToNewProjectChoosingFolder:(id)sender {
+    PTYTab *theTab = [[sender representedObject] identifier];
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    panel.canChooseDirectories = YES;
+    panel.canChooseFiles = NO;
+    panel.allowsMultipleSelection = NO;
+    panel.prompt = NSLocalizedStringWithDefaultValue(@"PseudoTerminal.ChooseProjectFolder", nil, [NSBundle mainBundle], @"Choose", @"Button in the open panel that picks a project’s folder");
+    NSString *dir = theTab.activeSession.currentLocalWorkingDirectory;
+    if (dir.length > 0) {
+        panel.directoryURL = [NSURL fileURLWithPath:dir isDirectory:YES];
+    }
+    __weak __typeof(self) weakSelf = self;
+    [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse result) {
+        if (result != NSModalResponseOK || !panel.URL.path) {
+            return;
+        }
+        [weakSelf addTab:theTab toProjectAtPath:panel.URL.path];
+    }];
+}
+
+// Put `theTab` in the project for `path`, creating the project if this window
+// has none for exactly that folder.
+- (void)addTab:(PTYTab *)theTab toProjectAtPath:(NSString *)path {
+    NSString *root = [path stringByStandardizingPath];
+    if (!theTab || [self indexOfTab:theTab] == NSNotFound || root.length == 0) {
+        return;
+    }
+    [self syncProjectsFromTabs];
+    iTermTabGroup *project = nil;
+    for (iTermTabGroup *candidate in _projects) {
+        if ([[candidate.projectPath stringByStandardizingPath] isEqualToString:root]) {
+            project = candidate;
+            break;
+        }
+    }
+    if (!project) {
+        NSString *name = root.lastPathComponent.length > 0 ? root.lastPathComponent : root;
+        project = [[[iTermTabGroup alloc] initWithUniqueIdentifier:[[NSUUID UUID] UUIDString]
+                                                             name:name
+                                                            color:[self nextTabGroupColor]
+                                                      projectPath:root] autorelease];
+        if (!_projects) {
+            _projects = [[NSMutableArray alloc] init];
+        }
+        [_projects addObject:project];
+        RLog(@"tabGroup: New Project %@ at %@", project.uniqueIdentifier, root);
+    }
+    theTab.tabGroupID = project.uniqueIdentifier;
+    [self finalizeTabGroupMembershipChangeForTab:theTab];
+}
+
+// PSMTabBarControlDelegate: the + on a project's chip.
+- (void)tabView:(NSTabView *)aTabView newTabInTabGroup:(NSString *)groupID {
+    [self newTabInProject:groupID];
+}
+
+- (void)newTabInProjectFromMenu:(id)sender {
+    [self newTabInProject:[sender representedObject]];
+}
+
+// A new tab started in the project's folder, placed after its last member (or
+// at the end when it has none) and added to it.
+- (void)newTabInProject:(NSString *)groupID {
+    iTermTabGroup *project = (iTermTabGroup *)[self tabGroupWithIdentifier:groupID];
+    if (project.projectPath.length == 0) {
+        return;
+    }
+    NSArray<PTYTab *> *members = [self tabsInGroup:groupID];
+    NSInteger index = members.count > 0 ? [self indexOfTab:members.lastObject] : NSNotFound;
+    index = (index == NSNotFound) ? (NSInteger)[self numberOfTabs] : index + 1;
+
+    NSMutableDictionary *profile = [[[[ProfileModel sharedInstance] defaultBookmark] mutableCopy] autorelease];
+    if (!profile) {
+        return;
+    }
+    profile[KEY_WORKING_DIRECTORY] = project.projectPath;
+    profile[KEY_CUSTOM_DIRECTORY] = kProfilePreferenceInitialDirectoryCustomValue;
+    __weak __typeof(self) weakSelf = self;
+    [iTermSessionLauncher launchBookmark:profile
+                              inTerminal:self
+                                   style:iTermOpenStyleTab
+                                 withURL:nil
+                        hotkeyWindowType:iTermHotkeyWindowTypeNone
+                                 makeKey:YES
+                             canActivate:YES
+                      respectTabbingMode:NO
+                                   index:@(index)
+                                 command:nil
+                             makeSession:nil
+                          didMakeSession:^(PTYSession *session) {
+        [weakSelf addTabForSession:session toProjectWithID:groupID];
+    }
+                              completion:nil];
+}
+
+- (void)addTabForSession:(PTYSession *)session toProjectWithID:(NSString *)groupID {
+    PTYTab *tab = [self tabForSession:session];
+    if (!tab || ![self tabGroupWithIdentifier:groupID]) {
+        return;
+    }
+    tab.pendingProjectAutoJoin = NO;
+    tab.tabGroupID = groupID;
+    [self finalizeTabGroupMembershipChangeForTab:tab];
+}
+
+// Forget a project. Its tabs stay open, ungrouped.
+- (void)removeProjectFromMenu:(id)sender {
+    NSString *groupID = [sender representedObject];
+    for (PTYTab *member in [self tabsInGroup:groupID]) {
+        member.tabGroupID = nil;
+        [self reconcileTabGroupDefinitionForTab:member];
+    }
+    NSUInteger i = [_projects indexOfObjectPassingTest:^BOOL(iTermTabGroup *p, NSUInteger idx, BOOL *stop) {
+        return [p.uniqueIdentifier isEqualToString:groupID];
+    }];
+    if (i != NSNotFound) {
+        [_projects removeObjectAtIndex:i];
+    }
+    RLog(@"tabGroup: removed project %@", groupID);
+    [self updateTabColors];
+}
+
+- (NSArray<NSDictionary *> *)projectsArrangement {
+    [self syncProjectsFromTabs];
+    NSMutableArray<NSDictionary *> *result = [NSMutableArray array];
+    for (iTermTabGroup *project in _projects) {
+        [result addObject:@{ @"id": project.uniqueIdentifier,
+                             @"name": project.name ?: @"",
+                             @"color": project.color.dictionaryValue ?: @{},
+                             @"path": project.projectPath ?: @"" }];
+    }
+    return result;
+}
+
+- (void)restoreProjectsFromArrangement:(NSArray *)arrangement {
+    if (![arrangement isKindOfClass:[NSArray class]]) {
+        return;
+    }
+    for (NSDictionary *dict in arrangement) {
+        if (![dict isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString *gid = dict[@"id"];
+        NSString *path = dict[@"path"];
+        if (![gid isKindOfClass:[NSString class]] || ![path isKindOfClass:[NSString class]] ||
+            gid.length == 0 || path.length == 0 || [self projectWithID:gid]) {
+            continue;
+        }
+        NSDictionary *colorDict = [dict[@"color"] isKindOfClass:[NSDictionary class]] ? dict[@"color"] : nil;
+        NSString *name = [dict[@"name"] isKindOfClass:[NSString class]] ? dict[@"name"] : path.lastPathComponent;
+        iTermTabGroup *project = [[[iTermTabGroup alloc] initWithUniqueIdentifier:gid
+                                                                            name:name
+                                                                           color:([colorDict colorValue] ?: [NSColor systemBlueColor])
+                                                                     projectPath:path] autorelease];
+        if (!_projects) {
+            _projects = [[NSMutableArray alloc] init];
+        }
+        [_projects addObject:project];
+    }
+    [self updateTabGroups];
 }
 
 // Re-derive the group chips and lay the tab bar out synchronously. The drag
@@ -9125,6 +9412,21 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     newGroupItem.representedObject = tabViewItem;
     newGroupItem.target = self;
     [groupMenu addItem:newGroupItem];
+
+    if (theTab.activeSession.currentLocalWorkingDirectory.length > 0) {
+        NSMenuItem *projectItem = [[[NSMenuItem alloc] initWithTitle:NSLocalizedStringWithDefaultValue(@"PseudoTerminal.NewProjectFromTabFolder", nil, [NSBundle mainBundle], @"New Project from This Tab’s Folder", @"Menu item that creates a project (a tab group tied to a folder) from the tab’s current directory")
+                                                              action:@selector(addTabToNewProjectFromFolder:)
+                                                       keyEquivalent:@""] autorelease];
+        projectItem.representedObject = tabViewItem;
+        projectItem.target = self;
+        [groupMenu addItem:projectItem];
+    }
+    NSMenuItem *chooseProjectItem = [[[NSMenuItem alloc] initWithTitle:NSLocalizedStringWithDefaultValue(@"PseudoTerminal.NewProjectFromFolder", nil, [NSBundle mainBundle], @"New Project from Folder…", @"Menu item that creates a project (a tab group tied to a folder) from a folder the user picks")
+                                                                action:@selector(addTabToNewProjectChoosingFolder:)
+                                                         keyEquivalent:@""] autorelease];
+    chooseProjectItem.representedObject = tabViewItem;
+    chooseProjectItem.target = self;
+    [groupMenu addItem:chooseProjectItem];
 
     NSArray<iTermTabGroup *> *groups = [self tabGroupsInWindow];
     if (groups.count > 0) {
@@ -9183,6 +9485,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     theTab.tabGroupID = [[NSUUID UUID] UUIDString];
     theTab.tabGroupName = name;
     theTab.tabGroupColor = [self nextTabGroupColor];
+    theTab.tabGroupProjectPath = nil;
     RLog(@"tabGroup: New Group %@ (%@) from tab %@", theTab.tabGroupID, name, defaultName);
     [self updateTabColors];
 }
@@ -9254,9 +9557,12 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
             continue;
         }
         [seen addObject:gid];
-        [result addObject:[[[iTermTabGroup alloc] initWithUniqueIdentifier:gid
-                                                                      name:(aTab.tabGroupName ?: @"")
-                                                                     color:(aTab.tabGroupColor ?: [NSColor systemBlueColor])] autorelease]];
+        [result addObject:[self tabGroupDefinedByTab:aTab]];
+    }
+    for (iTermTabGroup *project in _projects) {
+        if (![seen containsObject:project.uniqueIdentifier]) {
+            [result addObject:project];
+        }
     }
     return result;
 }
@@ -9294,6 +9600,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
         tab.tabGroupID = gid;
         tab.tabGroupName = name;
         tab.tabGroupColor = color;
+        tab.tabGroupProjectPath = nil;
         tab.tabGroupCollapsed = NO;
     }
     RLog(@"tabGroup: grouped %@ tabs into new group %@ (%@)", @(tabs.count), gid, name);
@@ -9331,6 +9638,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     return @{ @"id": tab.tabGroupID ?: [NSNull null],
               @"name": tab.tabGroupName ?: [NSNull null],
               @"color": tab.tabGroupColor ?: [NSNull null],
+              @"projectPath": tab.tabGroupProjectPath ?: [NSNull null],
               @"collapsed": @(tab.tabGroupCollapsed) };
 }
 
@@ -9362,6 +9670,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     // drop them as dead writes.
     tab.tabGroupName = [snapshot[@"name"] nilIfNull];
     tab.tabGroupColor = [snapshot[@"color"] nilIfNull];
+    tab.tabGroupProjectPath = [snapshot[@"projectPath"] nilIfNull];
     tab.tabGroupCollapsed = [snapshot[@"collapsed"] boolValue];
     [self finalizeTabGroupMembershipChangeForTab:tab];
 }
@@ -9604,6 +9913,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     if (gid.length == 0) {
         tab.tabGroupName = nil;
         tab.tabGroupColor = nil;
+        tab.tabGroupProjectPath = nil;
         tab.tabGroupCollapsed = NO;
         return;
     }
@@ -9611,6 +9921,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
         if (member != tab && [member.tabGroupID isEqualToString:gid]) {
             tab.tabGroupName = member.tabGroupName;
             tab.tabGroupColor = member.tabGroupColor;
+            tab.tabGroupProjectPath = member.tabGroupProjectPath;
             // Adopt the group's collapsed state so a tab joining a collapsed
             // group matches its siblings. The invariant is restored afterward:
             // if the joining tab is the active one, PseudoTerminal expands it.
@@ -9625,6 +9936,14 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
             }
             return;
         }
+    }
+    // First tab of an empty project: take the definition from the registry.
+    iTermTabGroup *project = [self projectWithID:gid];
+    if (project) {
+        tab.tabGroupName = project.name;
+        tab.tabGroupColor = project.color;
+        tab.tabGroupProjectPath = project.projectPath;
+        tab.tabGroupCollapsed = NO;
     }
 }
 
@@ -9644,10 +9963,31 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     return result;
 }
 
+- (NSMenu *)menuForEmptyProject:(NSString *)groupID {
+    NSMenu *menu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
+    menu.autoenablesItems = NO;
+    menu.appearance = [self tabBarContextMenuAppearance];
+    NSArray<NSArray<NSString *> *> *specs = @[
+        @[NSLocalizedStringWithDefaultValue(@"PseudoTerminal.NewTabInProject", nil, [NSBundle mainBundle], @"New Tab in Project", @"Menu item that opens a new tab in a project’s folder"), @"newTabInProjectFromMenu:"],
+        @[NSLocalizedStringWithDefaultValue(@"PseudoTerminal.RenameProject", nil, [NSBundle mainBundle], @"Rename Project…", @"Menu item that renames a project (a tab group tied to a folder)"), @"renameTabGroupFromMenu:"],
+        @[NSLocalizedStringWithDefaultValue(@"PseudoTerminal.RemoveProject", nil, [NSBundle mainBundle], @"Remove Project", @"Menu item that removes a project (a tab group tied to a folder) without closing tabs"), @"removeProjectFromMenu:"],
+    ];
+    for (NSArray<NSString *> *spec in specs) {
+        NSMenuItem *mi = [[[NSMenuItem alloc] initWithTitle:spec[0]
+                                                     action:NSSelectorFromString(spec[1])
+                                              keyEquivalent:@""] autorelease];
+        mi.representedObject = groupID;
+        mi.target = self;
+        [menu addItem:mi];
+    }
+    return menu;
+}
+
 // PSMTabViewDelegate: right-click on a group chip.
 - (NSMenu *)tabView:(NSTabView *)aTabView menuForTabGroup:(NSString *)groupID {
+    iTermTabGroup *project = [self projectWithID:groupID];
     if ([self tabsInGroup:groupID].count == 0) {
-        return nil;
+        return project ? [self menuForEmptyProject:groupID] : nil;
     }
     NSMenu *menu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
     menu.autoenablesItems = NO;  // contextual actions are always applicable
@@ -9656,7 +9996,8 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     NSString *closeAfterTitle = [self tabBarIsVertical] ? NSLocalizedStringWithDefaultValue(@"PseudoTerminal.CloseTabsBelow", nil, [NSBundle mainBundle], @"Close Tabs Below", @"Menu item that closes tabs below the current one")
                                                         : NSLocalizedStringWithDefaultValue(@"PseudoTerminal.CloseTabsToTheRight", nil, [NSBundle mainBundle], @"Close Tabs to the Right", @"Menu item that closes tabs to the right");
     NSArray<NSArray<NSString *> *> *specs = @[
-        @[NSLocalizedStringWithDefaultValue(@"PseudoTerminal.NewTabInGroup", nil, [NSBundle mainBundle], @"New Tab in Group", @"Menu item that creates a new tab in the current group"), @"newTabInGroup:"],
+        project ? @[NSLocalizedStringWithDefaultValue(@"PseudoTerminal.NewTabInProject", nil, [NSBundle mainBundle], @"New Tab in Project", @"Menu item that opens a new tab in a project’s folder"), @"newTabInProjectFromMenu:"]
+                : @[NSLocalizedStringWithDefaultValue(@"PseudoTerminal.NewTabInGroup", nil, [NSBundle mainBundle], @"New Tab in Group", @"Menu item that creates a new tab in the current group"), @"newTabInGroup:"],
         @[@"-", @""],
         collapsed ? @[NSLocalizedStringWithDefaultValue(@"PseudoTerminal.ExpandGroup", nil, [NSBundle mainBundle], @"Expand Group", @"Menu item that expands a collapsed tab group"), @"expandTabGroupFromMenu:"]
                   : @[NSLocalizedStringWithDefaultValue(@"PseudoTerminal.CollapseGroup", nil, [NSBundle mainBundle], @"Collapse Group", @"Menu item that collapses a tab group"), @"collapseTabGroupFromMenu:"],
@@ -9957,6 +10298,24 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     [self toggleTabGroupCollapsed:groupID];
 }
 
+- (void)renameEmptyProject:(NSString *)groupID {
+    iTermTabGroup *project = [self projectWithID:groupID];
+    if (!project) {
+        return;
+    }
+    NSString *name = [self promptForTabGroupName:project.name title:NSLocalizedStringWithDefaultValue(@"PseudoTerminal.RenameProjectTitle", nil, [NSBundle mainBundle], @"Rename Project", @"Title of the dialog for renaming a project (a tab group tied to a folder)")];
+    if (!name) {
+        return;
+    }
+    iTermTabGroup *renamed = [[[iTermTabGroup alloc] initWithUniqueIdentifier:groupID
+                                                                         name:name
+                                                                        color:project.color
+                                                                  projectPath:project.projectPath] autorelease];
+    [_projects replaceObjectAtIndex:[_projects indexOfObjectIdenticalTo:project] withObject:renamed];
+    [self updateTabColors];
+    [self relayoutTabGroupChipsSynchronously];
+}
+
 - (void)renameTabGroupFromMenu:(id)sender {
     [self renameTabGroupWithID:[sender representedObject]];
 }
@@ -9964,6 +10323,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
 - (void)renameTabGroupWithID:(NSString *)groupID {
     NSArray<PTYTab *> *members = [self tabsInGroup:groupID];
     if (members.count == 0) {
+        [self renameEmptyProject:groupID];
         return;
     }
     NSString *name = [self promptForTabGroupName:(members.firstObject.tabGroupName ?: @"") title:NSLocalizedStringWithDefaultValue(@"PseudoTerminal.RenameTabGroupTitle", nil, [NSBundle mainBundle], @"Rename Tab Group", @"Title of the dialog for renaming a tab group")];
@@ -10055,6 +10415,8 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
                 aTab.tabGroupID = newID;
                 aTab.tabGroupName = newName;
                 aTab.tabGroupColor = newColor;
+                // A copy is a plain group: a folder identifies a single project.
+                aTab.tabGroupProjectPath = nil;
                 // Start expanded (the copy inherited the source's collapsed flag)
                 // so the freshly-selected copy never sits inside a collapsed group.
                 aTab.tabGroupCollapsed = NO;
@@ -15224,6 +15586,7 @@ typedef NS_ENUM(NSUInteger, iTermBroadcastCommand) {
         copyOfTab.tabGroupID = nil;
         copyOfTab.tabGroupName = nil;
         copyOfTab.tabGroupColor = nil;
+        copyOfTab.tabGroupProjectPath = nil;
         copyOfTab.tabGroupCollapsed = NO;
         [copyOfTab updatePaneTitles];
         [iTermSessionLauncher launchBookmark:self.currentSession.profile
@@ -16914,6 +17277,7 @@ backgroundColor:(NSColor *)backgroundColor {
         tab.tabGroupID = gid;
         tab.tabGroupName = name;
         tab.tabGroupColor = color;
+        tab.tabGroupProjectPath = nil;
         tab.tabGroupCollapsed = NO;
     }
     RLog(@"tabGroup: API created group %@ (%@) from %@ tabs", gid, name, @(tabs.count));

@@ -1418,10 +1418,21 @@ static const CGFloat kPSMSquaredCollapsedChevron = 14;  // room for the collapse
                                          inBar:bar
                                   isDropTarget:[gid isEqualToString:dropTargetGID]];
     }];
+    // A group with no members (an empty project) draws as a memberless block.
+    [bar enumerateEmptyTabGroupChipsWithBlock:^(PSMTabBarCell *chip, NSString *gid) {
+        [self drawSquaredCollapsedTabGroupChip:chip
+                                   memberCount:0
+                                       groupID:gid
+                                         inBar:bar
+                                  isDropTarget:NO];
+    }];
 }
 
 // The collapsed chip's label: "Name  N", or just "N" when the group is unnamed.
 - (NSString *)collapsedLabelForName:(NSString *)name count:(NSInteger)count {
+    if (count <= 0) {
+        return name ?: @"";
+    }
     if (name.length > 0) {
         return [NSString stringWithFormat:@"%@  %@", name, @(count)];
     }
@@ -1483,7 +1494,7 @@ static const CGFloat kPSMSquaredCollapsedChevron = 14;  // room for the collapse
                                  textHeight);
     [label drawInRect:textRect withAttributes:attrs];
 
-    // Downward chevron: the collapse affordance.
+    // Downward chevron: the collapse affordance. Nothing to expand when empty.
     const CGFloat cx = NSMaxX(box) - pad - chevronW / 2.0;
     const CGFloat cy = NSMidY(box);
     const CGFloat half = 3;
@@ -1495,7 +1506,9 @@ static const CGFloat kPSMSquaredCollapsedChevron = 14;  // room for the collapse
     chevron.lineCapStyle = NSLineCapStyleRound;
     chevron.lineJoinStyle = NSLineJoinStyleRound;
     [textColor setStroke];
-    [chevron stroke];
+    if (count > 0) {
+        [chevron stroke];
+    }
 
     // Squared enclosing outline.
     [groupColor set];

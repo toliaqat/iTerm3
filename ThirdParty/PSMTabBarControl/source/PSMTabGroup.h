@@ -19,6 +19,10 @@ NS_ASSUME_NONNULL_BEGIN
 @protocol PSMTabGroup <NSObject>
 @property (nonatomic, readonly) NSString *name;
 @property (nonatomic, readonly) NSColor *color;
+@optional
+// Folder a project group represents. A project's chip gets a + button that
+// opens a new tab in this folder. nil for a plain group.
+@property (nonatomic, readonly, nullable) NSString *projectPath;
 @end
 
 // Supplies group definitions to the tab bar by identifier. The window

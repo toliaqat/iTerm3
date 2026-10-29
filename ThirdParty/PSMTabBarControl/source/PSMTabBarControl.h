@@ -124,6 +124,9 @@ extern PSMTabBarControlOptionKey PSMTabBarControlOptionPUAFontProvider;  // id<P
 // A single click on a tab group's chip: toggle the group's collapsed state
 // (checked with -respondsToSelector:).
 - (void)tabView:(NSTabView *)aTabView toggleCollapseOfTabGroup:(NSString *)tabGroupIdentifier;
+// A click on the + button of a project group's chip (checked with
+// -respondsToSelector:).
+- (void)tabView:(NSTabView *)aTabView newTabInTabGroup:(NSString *)tabGroupIdentifier;
 
 //Drag and drop methods
 - (BOOL)tabView:(NSTabView *)aTabView shouldDragTabViewItem:(NSTabViewItem *)tabViewItem fromTabBar:(PSMTabBarControl *)tabBarControl;
@@ -335,6 +338,19 @@ extern const CGFloat PSMTabBarProgressBarHeight;
 // bar. `flags` are NSNumber booleans matched to `tabViewItems` by identity.
 - (void)setTabGroupCollapsedFlags:(NSArray<NSNumber *> *)flags
                   forTabViewItems:(NSArray<NSTabViewItem *> *)tabViewItems;
+
+// Groups that have no member tabs but should still show a chip (empty
+// projects). Their chips go after all tabs. Ids that do have members are ignored.
+- (void)setEmptyTabGroupIdentifiers:(NSArray<NSString *> *)identifiers;
+
+// Enumerate the chips of groups that have no member tabs.
+- (void)enumerateEmptyTabGroupChipsWithBlock:(void (NS_NOESCAPE ^)(PSMTabBarCell *chip,
+                                                                   NSString *groupID))block
+    NS_SWIFT_NAME(enumerateEmptyTabGroupChips(block:));
+
+// Frame of the + button on a project group's chip, or NSZeroRect if the chip
+// has none (not a project, or not drawn in the bar).
+- (NSRect)addButtonRectForTabGroupChip:(PSMTabBarCell *)chip;
 
 // Enumerate each fully collapsed group's chip with its (derived) member count.
 - (void)enumerateCollapsedTabGroupChipsWithBlock:(void (NS_NOESCAPE ^)(PSMTabBarCell *chip,
