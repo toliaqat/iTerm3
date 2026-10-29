@@ -836,7 +836,7 @@ static void iTermPreferencesRefreshFastCachesForKey(NSString *key);
                   kPreferenceKeyTopBottomMargins: @2,
                   kPreferenceKeySideMargins: @5,
                   kPreferenceKeyHideTabBar: @YES,
-                  kPreferenceKeyHideTabNumber: @NO,
+                  kPreferenceKeyHideTabNumber: @YES,
                   kPreferenceKeyPreserveWindowSizeWhenTabBarVisibilityChanges: @NO,
                   kPreferenceKeyPreserveWindowSizeToKeepOnScreenWhenTabBarVisibilityChanges: @NO,
                   kPreferenceKeyHideTabCloseButton: @NO,  // Deprecated

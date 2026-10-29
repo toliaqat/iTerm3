@@ -1443,7 +1443,7 @@ static const CGFloat kPSMSquaredCollapsedChevron = 14;  // room for the collapse
                                    label:(NSString *)label
                            trailingSpace:(CGFloat)trailingSpace
                                    inBar:(PSMTabBarControl *)bar {
-    const NSRect header = NSInsetRect(rect, 4, 2);
+    const NSRect header = NSInsetRect(rect, 4, 4);
     if (NSWidth(header) <= 0 || NSHeight(header) <= 0) {
         return;
     }
@@ -1460,7 +1460,8 @@ static const CGFloat kPSMSquaredCollapsedChevron = 14;  // room for the collapse
     NSDictionary *attrs = @{ NSFontAttributeName: font,
                              NSForegroundColorAttributeName: [self tabGroupAccentColorForColor:groupColor inBar:bar],
                              NSParagraphStyleAttributeName: para };
-    const CGFloat textHeight = ceil(font.ascender - font.descender);
+    // The line height (with leading), so the glyphs aren't clipped.
+    const CGFloat textHeight = ceil([label sizeWithAttributes:attrs].height);
     const CGFloat pad = kPSMSquaredGroupNamePad - 2;
     NSRect textRect = NSMakeRect(NSMinX(header) + pad,
                                  NSMidY(header) - textHeight / 2.0,
@@ -1707,9 +1708,9 @@ static const CGFloat kPSMSquaredCollapsedChevron = 14;  // room for the collapse
     }
 
     if (!horizontal) {
-        // The header excludes the gap down to the first tab.
-        NSRect headerRect = solid;
-        headerRect.size.height = MAX(0, NSHeight(solid) - kPSMSquaredGroupBArea);
+        // The header fills the chip's row so it is centered on the + button.
+        const NSRect headerRect = NSMakeRect(NSMinX(box), NSMinY(chipFrame),
+                                             NSWidth(box), NSHeight(chipFrame));
         [self drawVerticalTabGroupHeaderInRect:headerRect
                                          color:groupColor
                                          label:name
