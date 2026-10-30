@@ -749,6 +749,13 @@
     if (selected) {
         [[self backgroundColorSelected:YES highlightAmount:highlightAmount] set];
         [pill fill];
+        // Some themes' selected color is nearly the bar color, so tint the pill
+        // with the accent color to make the selection easy to find.
+        if (!tabColor) {
+            const BOOL dark = _tabBar ? [self barIsDark:_tabBar] : NO;
+            [[[NSColor controlAccentColor] colorWithAlphaComponent:dark ? 0.35 : 0.22] set];
+            [pill fill];
+        }
     }
     if (tabColor) {
         [[self cellBackgroundColorForTabColor:tabColor selected:selected] set];
