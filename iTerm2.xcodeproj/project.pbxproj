@@ -15052,7 +15052,6 @@
 			name = KeyMappers;
 			sourceTree = "<group>";
 		};
-		A6FE7A912E0E6B7F00BEBCE4 /* Autofill */ = {
 		DA8B55F0CD63369E368CDD96 /* AgentSessions */ = {
 			isa = PBXGroup;
 			children = (
@@ -15063,6 +15062,7 @@
 			path = AgentSessions;
 			sourceTree = "<group>";
 		};
+		A6FE7A912E0E6B7F00BEBCE4 /* Autofill */ = {
 			isa = PBXGroup;
 			children = (
 				A6E3136E2E3E9AE0008222DE /* autofill-core.js */,
