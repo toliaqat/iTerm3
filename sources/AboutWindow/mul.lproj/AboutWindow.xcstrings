@@ -2,43 +2,43 @@
   "sourceLanguage": "en",
   "strings": {
     "U4n-GV-8aZ.title": {
-      "comment": "Class = \"NSTextFieldCell\"; title = \"iTerm2\"; ObjectID = \"U4n-GV-8aZ\";",
+      "comment": "Class = \"NSTextFieldCell\"; title = \"iTerm3\"; ObjectID = \"U4n-GV-8aZ\";",
       "extractionState": "extracted_with_value",
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "iTerm2"
+            "value": "iTerm3"
           }
         },
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "iTerm2"
+            "value": "iTerm3"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "iTerm2"
+            "value": "iTerm3"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "iTerm2"
+            "value": "iTerm3"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "iTerm2"
+            "value": "iTerm3"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "iTerm2"
+            "value": "iTerm3"
           }
         }
       }

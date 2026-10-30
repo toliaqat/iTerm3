@@ -8269,37 +8269,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 wird von diesen Unterstützern auf <a href=\"https://patreon.com/gnachman\">Patreon</a> und <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a> unterstützt"
+            "value" : "iTerm3 wird von diesen Unterstützern auf <a href=\"https://patreon.com/gnachman\">Patreon</a> und <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a> unterstützt"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "iTerm2 is supported by these backers on <a href=\"https://patreon.com/gnachman\">Patreon</a> and <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>"
+            "value" : "iTerm3 is supported by these backers on <a href=\"https://patreon.com/gnachman\">Patreon</a> and <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2は<a href=\"https://patreon.com/gnachman\">Patreon</a>と<a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>の以下の支援者にサポートされています"
+            "value" : "iTerm3は<a href=\"https://patreon.com/gnachman\">Patreon</a>と<a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>の以下の支援者にサポートされています"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O iTerm2 conta com estes apoiadores no <a href=\"https://patreon.com/gnachman\">Patreon</a> e no <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>"
+            "value" : "O iTerm3 conta com estes apoiadores no <a href=\"https://patreon.com/gnachman\">Patreon</a> e no <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 поддерживают эти спонсоры на <a href=\"https://patreon.com/gnachman\">Patreon</a> и <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>"
+            "value" : "iTerm3 поддерживают эти спонсоры на <a href=\"https://patreon.com/gnachman\">Patreon</a> и <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2由<a href=\"https://patreon.com/gnachman\">Patreon</a>和<a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>的赞助者支持"
+            "value" : "iTerm3由<a href=\"https://patreon.com/gnachman\">Patreon</a>和<a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>的赞助者支持"
           }
         }
       }
@@ -156735,37 +156735,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 beenden?"
+            "value" : "iTerm3 beenden?"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Quit iTerm2?"
+            "value" : "Quit iTerm3?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 を終了しますか？"
+            "value" : "iTerm3 を終了しますか？"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encerrar o iTerm2?"
+            "value" : "Encerrar o iTerm3?"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Завершить работу iTerm2?"
+            "value" : "Завершить работу iTerm3?"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "退出 iTerm2？"
+            "value" : "退出 iTerm3？"
           }
         }
       }
@@ -186269,37 +186269,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 beenden"
+            "value" : "iTerm3 beenden"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Quit iTerm2"
+            "value" : "Quit iTerm3"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 を終了"
+            "value" : "iTerm3 を終了"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encerrar o iTerm2"
+            "value" : "Encerrar o iTerm3"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Завершить iTerm2"
+            "value" : "Завершить iTerm3"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "退出 iTerm2"
+            "value" : "退出 iTerm3"
           }
         }
       }

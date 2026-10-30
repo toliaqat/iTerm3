@@ -1472,85 +1472,85 @@
       }
     },
     "56.title" : {
-      "comment" : "Class = \"NSMenuItem\"; title = \"iTerm2\"; ObjectID = \"56\";",
+      "comment" : "Class = \"NSMenuItem\"; title = \"iTerm3\"; ObjectID = \"56\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         }
       }
     },
     "57.title" : {
-      "comment" : "Class = \"NSMenu\"; title = \"iTerm2\"; ObjectID = \"57\";",
+      "comment" : "Class = \"NSMenu\"; title = \"iTerm3\"; ObjectID = \"57\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2"
+            "value" : "iTerm3"
           }
         }
       }
@@ -1808,43 +1808,43 @@
       }
     },
     "111.title" : {
-      "comment" : "Class = \"NSMenuItem\"; title = \"iTerm2 Help\"; ObjectID = \"111\";",
+      "comment" : "Class = \"NSMenuItem\"; title = \"iTerm3 Help\"; ObjectID = \"111\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2-Hilfe"
+            "value" : "iTerm3-Hilfe"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "iTerm2 Help"
+            "value" : "iTerm3 Help"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2ヘルプ"
+            "value" : "iTerm3ヘルプ"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajuda do iTerm2"
+            "value" : "Ajuda do iTerm3"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Справка по iTerm2"
+            "value" : "Справка по iTerm3"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 帮助"
+            "value" : "iTerm3 帮助"
           }
         }
       }
@@ -1976,85 +1976,85 @@
       }
     },
     "134.title" : {
-      "comment" : "Class = \"NSMenuItem\"; title = \"Hide iTerm2\"; ObjectID = \"134\";",
+      "comment" : "Class = \"NSMenuItem\"; title = \"Hide iTerm3\"; ObjectID = \"134\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 ausblenden"
+            "value" : "iTerm3 ausblenden"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Hide iTerm2"
+            "value" : "Hide iTerm3"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2を隠す"
+            "value" : "iTerm3を隠す"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ocultar o iTerm2"
+            "value" : "Ocultar o iTerm3"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Скрыть iTerm2"
+            "value" : "Скрыть iTerm3"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "隐藏 iTerm2"
+            "value" : "隐藏 iTerm3"
           }
         }
       }
     },
     "136.title" : {
-      "comment" : "Class = \"NSMenuItem\"; title = \"Quit iTerm2\"; ObjectID = \"136\";",
+      "comment" : "Class = \"NSMenuItem\"; title = \"Quit iTerm3\"; ObjectID = \"136\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 beenden"
+            "value" : "iTerm3 beenden"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Quit iTerm2"
+            "value" : "Quit iTerm3"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2を終了"
+            "value" : "iTerm3を終了"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encerrar o iTerm2"
+            "value" : "Encerrar o iTerm3"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Завершить iTerm2"
+            "value" : "Завершить iTerm3"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "退出 iTerm2"
+            "value" : "退出 iTerm3"
           }
         }
       }
@@ -2480,43 +2480,43 @@
       }
     },
     "233.title" : {
-      "comment" : "Class = \"NSMenuItem\"; title = \"About iTerm2\"; ObjectID = \"233\";",
+      "comment" : "Class = \"NSMenuItem\"; title = \"About iTerm3\"; ObjectID = \"233\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Über iTerm2"
+            "value" : "Über iTerm3"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "About iTerm2"
+            "value" : "About iTerm3"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2について"
+            "value" : "iTerm3について"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sobre o iTerm2"
+            "value" : "Sobre o iTerm3"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "О программе iTerm2"
+            "value" : "О программе iTerm3"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "关于 iTerm2"
+            "value" : "关于 iTerm3"
           }
         }
       }
@@ -6554,43 +6554,43 @@
       }
     },
     "1470.title" : {
-      "comment" : "Class = \"NSMenuItem\"; title = \"Make iTerm2 Default Term\"; ObjectID = \"1470\";",
+      "comment" : "Class = \"NSMenuItem\"; title = \"Make iTerm3 Default Term\"; ObjectID = \"1470\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2 als Standardterminal festlegen"
+            "value" : "iTerm3 als Standardterminal festlegen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Make iTerm2 Default Term"
+            "value" : "Make iTerm3 Default Term"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iTerm2を既定のターミナルにする"
+            "value" : "iTerm3を既定のターミナルにする"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tornar o iTerm2 o terminal padrão"
+            "value" : "Tornar o iTerm3 o terminal padrão"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сделать iTerm2 терминалом по умолчанию"
+            "value" : "Сделать iTerm3 терминалом по умолчанию"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将 iTerm2 设为默认终端"
+            "value" : "将 iTerm3 设为默认终端"
           }
         }
       }
@@ -10040,43 +10040,43 @@
       }
     },
     "it2-au-th0.title" : {
-      "comment" : "Class = \"NSMenuItem\"; title = \"Remote host can control iTerm2\"; ObjectID = \"it2-au-th0\";",
+      "comment" : "Class = \"NSMenuItem\"; title = \"Remote host can control iTerm3\"; ObjectID = \"it2-au-th0\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remote-Host darf iTerm2 steuern"
+            "value" : "Remote-Host darf iTerm3 steuern"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Remote host can control iTerm2"
+            "value" : "Remote host can control iTerm3"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リモートホストがiTerm2を制御できる"
+            "value" : "リモートホストがiTerm3を制御できる"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O host remoto pode controlar o iTerm2"
+            "value" : "O host remoto pode controlar o iTerm3"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Удалённый узел может управлять iTerm2"
+            "value" : "Удалённый узел может управлять iTerm3"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "远程主机可以控制 iTerm2"
+            "value" : "远程主机可以控制 iTerm3"
           }
         }
       }

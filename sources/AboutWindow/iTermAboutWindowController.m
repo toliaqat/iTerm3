@@ -132,7 +132,7 @@ static NSColor *iTermAboutContainerFillColor(void) {
     paragraphStyle.alignment = NSTextAlignmentCenter;
     _sponsorsHeading.selectable = YES;
     _sponsorsHeading.editable = NO;
-    NSString *headingHTML = NSLocalizedStringWithDefaultValue(@"About.BackersHeading", nil, [NSBundle mainBundle], @"iTerm2 is supported by these backers on <a href=\"https://patreon.com/gnachman\">Patreon</a> and <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>", @"About window heading. Keep the <a href=...> HTML tags and the URLs. ‘Patreon’ and ‘GitHub Sponsors’ are brand names, keep them. Only translate the prose ‘iTerm2 is supported by these backers on’ and ‘and’.");
+    NSString *headingHTML = NSLocalizedStringWithDefaultValue(@"About.BackersHeading", nil, [NSBundle mainBundle], @"iTerm3 is supported by these backers on <a href=\"https://patreon.com/gnachman\">Patreon</a> and <a href=\"https://github.com/sponsors/gnachman\">GitHub Sponsors</a>", @"About window heading. Keep the <a href=...> HTML tags and the URLs. ‘Patreon’ and ‘GitHub Sponsors’ are brand names, keep them. Only translate the prose ‘iTerm2 is supported by these backers on’ and ‘and’.");
     [_sponsorsHeading.textStorage setAttributedString:[NSAttributedString attributedStringWithHTML:headingHTML
                                                                                               font:_sponsorsHeading.font
                                                                                     paragraphStyle:paragraphStyle]];

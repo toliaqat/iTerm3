@@ -1091,7 +1091,7 @@ static NSModalResponse iTermCompareRenderingRunModal(id self, SEL _cmd) {
         }
         [NSApp activateIgnoringOtherApps:YES];
         NSAlert *alert = [[[NSAlert alloc] init] autorelease];
-        alert.messageText = NSLocalizedStringWithDefaultValue(@"QuitAlert.Title", nil, [NSBundle mainBundle], @"Quit iTerm2?", @"Title of the quit-confirmation alert");
+        alert.messageText = NSLocalizedStringWithDefaultValue(@"QuitAlert.Title", nil, [NSBundle mainBundle], @"Quit iTerm3?", @"Title of the quit-confirmation alert");
         alert.informativeText = message;
         [alert addButtonWithTitle:iTermLocalizedOK()];
         [alert addButtonWithTitle:iTermLocalizedCancel()];
@@ -1971,7 +1971,7 @@ static iTermKeyEventReplayer *gReplayer;
     mainMenuItem.submenu = [[NSApp mainMenu] it_deepCopy];
     [menu addItem:mainMenuItem];
     
-    item = [[[NSMenuItem alloc] initWithTitle:NSLocalizedStringWithDefaultValue(@"StatusMenu.QuitiTerm2", nil, [NSBundle mainBundle], @"Quit iTerm2", @"Status-icon menu item to quit iTerm2")
+    item = [[[NSMenuItem alloc] initWithTitle:NSLocalizedStringWithDefaultValue(@"StatusMenu.QuitiTerm2", nil, [NSBundle mainBundle], @"Quit iTerm3", @"Status-icon menu item to quit iTerm2")
                                        action:@selector(terminate:)
                                 keyEquivalent:@""] autorelease];
     [menu addItem:item];
