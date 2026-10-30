@@ -6289,6 +6289,10 @@ extendResultsAcrossSoftBoundaries:(BOOL)extendResultsAcrossSoftBoundaries {
     [_delegate sendText:text escaping:iTermSendTextEscapingVim];
 }
 
+- (BOOL)semanticHistoryOpenFileInFilesPanel:(NSString *)path {
+    return [_delegate textViewOpenFileInFilesPanel:path];
+}
+
 - (PTYFontInfo *)getFontForChar:(UniChar)ch
                       isComplex:(BOOL)isComplex
                      renderBold:(BOOL *)renderBold

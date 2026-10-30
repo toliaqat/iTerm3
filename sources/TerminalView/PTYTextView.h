@@ -118,6 +118,7 @@ extern const CGFloat PTYTextViewMarginClickGraceWidth;
 - (void)stopSendingTextSlowly;
 - (void)textViewSelectionDidChangeToTruncatedString:(NSString *)maybeSelection;
 - (void)launchCoprocessWithCommand:(NSString *)command;
+- (BOOL)textViewOpenFileInFilesPanel:(NSString *)path;
 - (void)insertText:(NSString *)string;
 - (PTYTask *)shell;
 - (BOOL)alertOnNextMark;

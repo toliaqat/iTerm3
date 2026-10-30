@@ -268,7 +268,8 @@ class ToolFiles: NSView, ToolbeltTool, NSOutlineViewDataSource, NSOutlineViewDel
 
     private func node(for url: URL) -> ToolFilesNode? {
         for row in 0..<outlineView.numberOfRows {
-            if let node = outlineView.item(atRow: row) as? ToolFilesNode, node.url == url {
+            if let node = outlineView.item(atRow: row) as? ToolFilesNode,
+               node.url.standardizedFileURL.path == url.standardizedFileURL.path {
                 return node
             }
         }
@@ -289,8 +290,36 @@ class ToolFiles: NSView, ToolbeltTool, NSOutlineViewDataSource, NSOutlineViewDel
 
     // MARK: - Opening files
 
+    // Opens a file from elsewhere, such as a ⌘-clicked path in the terminal. If it’s
+    // inside the tree, the tree expands to it.
+    @objc(openFileAtPath:)
+    func openFile(atPath path: String) {
+        let url = URL(fileURLWithPath: path).standardizedFileURL
+        if root == nil {
+            currentDirectoryDidChange()
+        }
+        if let rootURL = root?.url.standardizedFileURL {
+            let rootComponents = rootURL.pathComponents
+            let components = url.pathComponents
+            if components.count > rootComponents.count, Array(components.prefix(rootComponents.count)) == rootComponents {
+                var ancestor = rootURL
+                for component in components[rootComponents.count..<(components.count - 1)] {
+                    ancestor.appendPathComponent(component, isDirectory: true)
+                    if let node = node(for: ancestor) {
+                        outlineView.expandItem(node)
+                    }
+                }
+            }
+        }
+        open(ToolFilesNode(url: url, isDirectory: false))
+        selectOpenFile()
+        if let url = editor.url, let node = node(for: url) {
+            outlineView.scrollRowToVisible(outlineView.row(forItem: node))
+        }
+    }
+
     private func open(_ node: ToolFilesNode) {
-        if node.url == editor.url {
+        if node.url.standardizedFileURL.path == editor.url?.standardizedFileURL.path {
             return
         }
         guard editor.confirmDiscardingChanges() else {

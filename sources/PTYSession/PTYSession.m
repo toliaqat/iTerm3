@@ -16272,6 +16272,10 @@ typedef NS_ENUM(NSUInteger, PTYSessionTmuxReport) {
     [events removeAllObjects];
 }
 
+- (BOOL)textViewOpenFileInFilesPanel:(NSString *)path {
+    return [[_delegate realParentWindow] openFileInFilesPanel:path];
+}
+
 - (void)launchCoprocessWithCommand:(NSString *)command
 {
     [self launchCoprocessWithCommand:command mute:NO];

@@ -183,6 +183,9 @@
 // Show or hide this window's toolbelt.
 - (IBAction)toggleToolbeltVisibility:(id)sender;
 
+// Shows the toolbelt's Files tool with the file at path open. Returns NO if it can't.
+- (BOOL)openFileInFilesPanel:(NSString *)path;
+
 - (void)popupWillClose:(iTermPopupWindowController *)popup;
 
 - (void)toggleFullScreenMode:(id)sender;

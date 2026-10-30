@@ -47,6 +47,7 @@
 #import "NSURL+iTerm.h"
 #import "NSWorkspace+iTerm.h"
 #import "RegexKitLite.h"
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <sys/utsname.h>
 
 NSString *const kSemanticHistoryPathSubstitutionKey = @"semanticHistory.path";
@@ -950,6 +951,11 @@ NSString *const kSemanticHistoryColumnNumberKey = @"semanticHistory.columnNumber
         return;
     }
 
+    if (!isDirectory && [self openPathSpecially:path]) {
+        completion(YES);
+        return;
+    }
+
     if (isDirectory) {
         DLog(@"Open directory %@", path);
         [self openFile:path fragment:fragment target:target window:window];
@@ -1011,6 +1017,30 @@ NSString *const kSemanticHistoryColumnNumberKey = @"semanticHistory.columnNumber
 
     [self openFile:path fragment:fragment target:target window:window];
     completion(YES);
+}
+
+// Markdown goes to the Files panel and HTML to the web browser, regardless of the
+// configured editor. Returns YES if it handled the path.
+- (BOOL)openPathSpecially:(NSString *)path {
+    UTType *type = [UTType typeWithFilenameExtension:path.pathExtension];
+    if ([type conformsToType:[UTType typeWithIdentifier:@"net.daringfireball.markdown"]] ||
+        [@[ @"md", @"markdown", @"mdown", @"mkd", @"mdx" ] containsObject:path.pathExtension.lowercaseString]) {
+        DLog(@"Open markdown %@ in the Files panel", path);
+        return [self.delegate semanticHistoryOpenFileInFilesPanel:path];
+    }
+    if ([type conformsToType:UTTypeHTML]) {
+        NSURL *browserURL = [[NSWorkspace sharedWorkspace] URLForApplicationToOpenURL:[NSURL URLWithString:@"https://example.com"]];
+        if (!browserURL) {
+            return NO;
+        }
+        DLog(@"Open HTML %@ with %@", path, browserURL);
+        [[NSWorkspace sharedWorkspace] openURLs:@[ [NSURL fileURLWithPath:path] ]
+                           withApplicationAtURL:browserURL
+                                  configuration:[NSWorkspaceOpenConfiguration configuration]
+                              completionHandler:nil];
+        return YES;
+    }
+    return NO;
 }
 
 - (BOOL)canOpenFileWithLineNumberUsingEditorWithBundleId:(NSString *)appBundleId {

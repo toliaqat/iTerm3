@@ -43,6 +43,8 @@ extern NSString *const kSemanticHistoryColumnNumberKey;
 @protocol iTermSemanticHistoryControllerDelegate <NSObject>
 - (void)semanticHistoryLaunchCoprocessWithCommand:(NSString *)command;
 - (void)semanticHistorySendText:(NSString *)text;
+// Shows a file in the window's Files panel. Returns NO if there is no panel to show it in.
+- (BOOL)semanticHistoryOpenFileInFilesPanel:(NSString *)path;
 @end
 
 @interface iTermSemanticHistoryController : NSObject

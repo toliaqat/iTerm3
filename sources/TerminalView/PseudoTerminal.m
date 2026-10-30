@@ -1377,6 +1377,24 @@ ITERM_WEAKLY_REFERENCEABLE
     [self toggleToolbeltVisibility:sender];
 }
 
+- (BOOL)openFileInFilesPanel:(NSString *)path {
+    if (self.toolbeltProfileType != ProfileTypeTerminal) {
+        return NO;
+    }
+    if (![iTermToolbeltView shouldShowTool:kFilesToolName profileType:self.toolbeltProfileType]) {
+        [iTermToolbeltView toggleShouldShowTool:kFilesToolName];
+    }
+    if (!_contentView.shouldShowToolbelt) {
+        [self toggleToolbeltVisibility:nil];
+    }
+    ToolFiles *files = _contentView.toolbelt.filesView;
+    if (!files) {
+        return NO;
+    }
+    [files openFileAtPath:path];
+    return YES;
+}
+
 - (void)addFilesAccessoryViewControllerToTitleBarIfNeeded {
     if ((self.window.styleMask & NSWindowStyleMaskTitled) == 0 || ![self shouldHaveShortcutAccessory]) {
         return;
