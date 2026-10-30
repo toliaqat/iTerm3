@@ -9363,6 +9363,42 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
                               completion:nil];
 }
 
+// A row in the left tab bar's agent sessions panel was clicked. Opens a tab in
+// the session's folder and types the command that resumes it, so the shell
+// remains when the agent exits.
+- (void)rootTerminalViewOpenAgentSession:(iTermAgentSession *)agentSession {
+    NSMutableDictionary *profile = [[[[ProfileModel sharedInstance] defaultBookmark] mutableCopy] autorelease];
+    if (!profile) {
+        return;
+    }
+    NSString *directory = agentSession.directoryForNewTab;
+    if (directory) {
+        profile[KEY_WORKING_DIRECTORY] = directory;
+        profile[KEY_CUSTOM_DIRECTORY] = kProfilePreferenceInitialDirectoryCustomValue;
+    }
+    profile[KEY_INITIAL_TEXT] = agentSession.resumeCommand;
+    RLog(@"Resuming agent session in %@: %@", directory, agentSession.resumeCommand);
+    [iTermSessionLauncher launchBookmark:profile
+                              inTerminal:self
+                                   style:iTermOpenStyleTab
+                                 withURL:nil
+                        hotkeyWindowType:iTermHotkeyWindowTypeNone
+                                 makeKey:YES
+                             canActivate:YES
+                      respectTabbingMode:NO
+                                   index:nil
+                                 command:nil
+                             makeSession:nil
+                          didMakeSession:nil
+                              completion:nil];
+    // Drop the session from the list once the agent has claimed it.
+    for (NSNumber *delay in @[ @3, @10 ]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [[iTermAgentSessionStore shared] refreshWithMinimumInterval:0];
+        });
+    }
+}
+
 - (void)addTabForSession:(PTYSession *)session toProjectWithID:(NSString *)groupID {
     PTYTab *tab = [self tabForSession:session];
     if (!tab || ![self tabGroupWithIdentifier:groupID]) {

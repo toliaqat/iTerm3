@@ -100,6 +100,7 @@ typedef struct {
 
 @interface iTermRootTerminalView()<
     iTermTabBarControlViewDelegate,
+    iTermAgentSessionsPanelDelegate,
     iTermDragHandleViewDelegate,
     iTermGenericStatusBarContainer,
     iTermStoplightHotboxDelegate>
@@ -168,6 +169,8 @@ typedef struct {
 
 @implementation iTermRootTerminalView {
     BOOL _tabViewFrameReduced;
+    // Recent Copilot and Claude Code sessions, beneath a left tab bar.
+    iTermAgentSessionsPanel *_agentSessionsPanel;
     BOOL _haveShownToolbelt;
     iTermStoplightHotbox *_stoplightHotbox;
     // Shown in place of the hotbox's buttons when they would cover a toolbar
@@ -1857,7 +1860,7 @@ static NSColor *iTermWindowBorderColorFromSetting(NSString *setting) {
 
     // Apply tab bar frame and settings
     self.tabBarControl.insets = [self.delegate tabBarInsets];
-    [self setTabBarFrame:outputs.tabBarFrame];
+    [self setTabBarFrame:[self tabBarFrameAfterPlacingAgentSessionsPanelIn:outputs.tabBarFrame]];
     [self setTabBarControlAutoresizingMask:(NSViewHeightSizable | NSViewMaxXMargin)];
 
     // Apply tab view frame
@@ -1894,6 +1897,50 @@ static NSColor *iTermWindowBorderColorFromSetting(NSString *setting) {
     [self updateDivisionViewAndWindowNumberLabel];
 
     [self updateRightTabBarDragHandleForTabBarFrame:outputs.tabBarFrame];
+}
+
+// Places the agent sessions panel at the bottom of a left tab bar's frame and
+// returns what's left for the tab bar.
+- (NSRect)tabBarFrameAfterPlacingAgentSessionsPanelIn:(NSRect)tabBarFrame {
+    if (![iTermAdvancedSettingsModel showAgentSessionsInLeftTabBar] || NSIsEmptyRect(tabBarFrame)) {
+        return tabBarFrame;
+    }
+    if (!_agentSessionsPanel) {
+        _agentSessionsPanel = [[iTermAgentSessionsPanel alloc] initWithFrame:NSZeroRect];
+        _agentSessionsPanel.delegate = self;
+        _agentSessionsPanel.autoresizingMask = NSViewMaxXMargin | NSViewMaxYMargin;
+        [self addSubview:_agentSessionsPanel positioned:NSWindowAbove relativeTo:_tabBarBacking];
+    }
+    // Always leave room for a few tabs.
+    const CGFloat minimumTabBarHeight = 120;
+    const CGFloat available = NSHeight(tabBarFrame) - minimumTabBarHeight;
+    if (available < iTermAgentSessionsPanel.headerHeight) {
+        return tabBarFrame;
+    }
+    const CGFloat panelHeight = [_agentSessionsPanel heightForAvailableHeight:available];
+    _agentSessionsPanel.frame = NSMakeRect(NSMinX(tabBarFrame),
+                                           NSMinY(tabBarFrame),
+                                           NSWidth(tabBarFrame),
+                                           panelHeight);
+    _agentSessionsPanel.backgroundColor = [self.delegate rootTerminalViewTabBarBackgroundColorIgnoringTabColor:YES] ?: [NSColor windowBackgroundColor];
+    _agentSessionsPanel.textColor = [self.delegate rootTerminalViewTabBarTextColorForTitle] ?: [NSColor labelColor];
+    _agentSessionsPanel.hidden = NO;
+    NSRect remainder = tabBarFrame;
+    remainder.origin.y += panelHeight;
+    remainder.size.height -= panelHeight;
+    return remainder;
+}
+
+#pragma mark - iTermAgentSessionsPanelDelegate
+
+- (void)agentSessionsPanelDidChangeHeight:(iTermAgentSessionsPanel *)panel {
+    [self layoutSubviews];
+}
+
+- (void)agentSessionsPanel:(iTermAgentSessionsPanel *)panel openSession:(iTermAgentSession *)session {
+    if ([self.delegate respondsToSelector:@selector(rootTerminalViewOpenAgentSession:)]) {
+        [self.delegate rootTerminalViewOpenAgentSession:session];
+    }
 }
 
 - (void)updateLeftTabBarDragHandleForTabBarFrame:(CGRect)tabBarFrame {
@@ -2054,6 +2101,8 @@ static NSColor *iTermWindowBorderColorFromSetting(NSString *setting) {
         [self constrainToolbeltWidth];
     }
     _tabViewFrameReduced = NO;
+    // Only the left tab bar layout shows it.
+    _agentSessionsPanel.hidden = YES;
     if (![self tabBarShouldBeVisible]) {
         [self layoutSubviewsWithHiddenTabBarForWindow:thisWindow];
     } else {

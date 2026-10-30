@@ -10,6 +10,7 @@
 #import "SolidColorView.h"
 #import "VT100GridTypes.h"
 
+@class iTermAgentSession;
 @class iTermImageView;
 @class iTermRootTerminalView;
 @class iTermStatusBarViewController;
@@ -83,6 +84,10 @@
 - (void)rootTerminalViewDidLayoutSubviews;
 - (NSString *)rootTerminalViewCurrentTabSubtitle;
 - (id<PSMPUAFontProvider>)rootTerminalViewPUAFontProvider;
+
+@optional
+// A row in the agent sessions panel beneath a left tab bar was clicked.
+- (void)rootTerminalViewOpenAgentSession:(iTermAgentSession *)session;
 @end
 
 extern const NSInteger iTermRootTerminalViewWindowNumberLabelMargin;

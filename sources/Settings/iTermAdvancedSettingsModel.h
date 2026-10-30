@@ -481,6 +481,7 @@ extern NSString *const iTermAdvancedSettingsDidChange;
 + (BOOL)showHintsInSplitPaneMenuItems;
 + (BOOL)showMetalFPSmeter;
 + (BOOL)showSplitPanesInVerticalTabBar;
++ (BOOL)showAgentSessionsInLeftTabBar;
 + (void)setShowMetalFPSmeter:(BOOL)value;
 + (BOOL)showLocationsInScrollbar;
 + (BOOL)showMarksInScrollbar;
