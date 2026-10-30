@@ -9330,6 +9330,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     for (PTYTab *member in [self tabsInGroup:groupID]) {
         member.tabGroupID = nil;
         [self reconcileTabGroupDefinitionForTab:member];
+        [member refreshTabBarLabel];
     }
     NSUInteger i = [_projects indexOfObjectPassingTest:^BOOL(iTermTabGroup *p, NSUInteger idx, BOOL *stop) {
         return [p.uniqueIdentifier isEqualToString:groupID];
@@ -9579,6 +9580,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     RLog(@"tabGroup: removed tab %@ from group %@", label, theTab.tabGroupID);
     theTab.tabGroupID = nil;
     [self reconcileTabGroupDefinitionForTab:theTab];
+    [theTab refreshTabBarLabel];
     [self updateTabColors];
     // Removing a member from the middle of a group would otherwise leave the
     // now-ungrouped tab wedged between the remaining members, splitting them
@@ -9618,6 +9620,7 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
 // tab is finalized lands in one place instead of silently diverging.
 - (void)finalizeTabGroupMembershipChangeForTab:(PTYTab *)tab {
     [self reconcileTabGroupDefinitionForTab:tab];
+    [tab refreshTabBarLabel];
     [self updateTabColors];
     [self tabsDidReorder];
     [self expandTabGroupIfSelectedTabIsCollapsed];
@@ -13538,6 +13541,11 @@ static BOOL iTermApproximatelyEqualRects(NSRect lhs, NSRect rhs, double epsilon)
         });
         return;
     }
+    // The tab position may have changed, which decides whether pane rows (and
+    // so fixed tab titles) are shown.
+    for (PTYTab *aTab in [self tabs]) {
+        [aTab refreshTabBarLabel];
+    }
     if (self.windowType != _windowType) {
         [self updateWindowType];
     }
@@ -16718,11 +16726,31 @@ typedef NS_ENUM(NSUInteger, iTermBroadcastCommand) {
     if ([iTermAdvancedSettingsModel showSplitPanesInVerticalTabBar]) {
         [_contentView.tabBarControl paneTitlesDidChange];
     }
+    [tab refreshTabBarLabel];
+}
+
+// The project's folder for a tab in a project, else its first pane's name, so
+// the title doesn't change as you move between the panes listed below it.
+- (NSString *)fixedTitleForTabShowingPanes:(PTYTab *)tab {
+    if (![iTermAdvancedSettingsModel showSplitPanesInVerticalTabBar] || ![self tabBarIsVertical]) {
+        return nil;
+    }
+    NSArray<PTYSession *> *sessions = tab.sessions;
+    if (sessions.count < 2) {
+        return nil;
+    }
+    if (tab.tabGroupProjectPath.length > 0) {
+        return [tab.tabGroupProjectPath stringByAbbreviatingWithTildeInPath];
+    }
+    return [sessions.firstObject.name removingHTMLFromTabTitleIfNeeded];
 }
 
 - (void)advancedSettingsDidChange:(NSNotification *)notification {
     // Cheap when nothing changed, and also clears pane rows after the setting is turned off.
     [_contentView.tabBarControl paneTitlesDidChange];
+    for (PTYTab *aTab in [self tabs]) {
+        [aTab refreshTabBarLabel];
+    }
 }
 
 - (void)tabDidInvalidateStatusBar:(PTYTab *)tab {

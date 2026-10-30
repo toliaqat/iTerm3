@@ -54,6 +54,9 @@ typedef NS_OPTIONS(NSUInteger, PTYTabState) {
 - (void)numberOfSessionsDidChangeInTab:(PTYTab *)tab;
 // A pane's name or the tab's active pane changed.
 - (void)tabPaneTitlesDidChange:(PTYTab *)tab;
+// While a tab lists its panes beneath it, its own title stays fixed instead of
+// following the active pane. Returns that title, or nil to use the normal one.
+- (NSString *)fixedTitleForTabShowingPanes:(PTYTab *)tab;
 // A session's working directory became known or changed while the tab still
 // awaits project auto-join (see PTYTab.pendingProjectAutoJoin).
 - (void)tab:(PTYTab *)tab sessionCurrentDirectoryDidChange:(PTYSession *)session;

@@ -864,7 +864,24 @@ static void SetAgainstGrainDim(BOOL isVertical, NSSize *dest, CGFloat value) {
     // value -updateTabTitleForCurrentSessionName: resolved and meant, so
     // second-guessing it here would recreate the disagreement this fix removes.
     NSString *title = self.title ?: [[self activeSession] name];
+    // A title the user set by hand still wins.
+    if (self.variablesScope.tabTitleOverride.length == 0) {
+        NSString *fixed = [_delegate fixedTitleForTabShowingPanes:self];
+        if (fixed) {
+            title = fixed;
+        }
+    }
     return [self stringByAppendingSubtitleForActiveSession:title];
+}
+
+- (void)refreshTabBarLabel {
+    if (!tabViewItem_ || ![self activeSession]) {
+        return;
+    }
+    NSString *label = [self tabBarLabel];
+    if (![tabViewItem_.label isEqualToString:label]) {
+        [tabViewItem_ setLabel:label];
+    }
 }
 
 - (NSString *)stringByAppendingSubtitleForActiveSession:(NSString *)title {

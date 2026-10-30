@@ -123,6 +123,9 @@ typedef NS_ENUM(NSInteger, iTermHiddenFloatingPanesActivity) {
 // Folder of the project this tab's group represents, or nil for a plain group.
 // Part of the group definition, so it rides every member like name/color.
 @property (nonatomic, copy) NSString *tabGroupProjectPath;
+
+// Recompute the tab bar label; a no-op when it is unchanged.
+- (void)refreshTabBarLabel;
 // YES for a newly created tab until its first working directory is known. At
 // that point it joins the matching project, if any, and is never auto-moved again.
 @property (nonatomic) BOOL pendingProjectAutoJoin;
