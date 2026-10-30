@@ -133,6 +133,8 @@ final class SemanticHistoryControllerTests: XCTestCase, iTermObject, iTermSemant
     private var scope: iTermVariableScope!
     private var coprocessCommand: String?
     private var sentText: String?
+    private var filesPanelPath: String?
+    private var filesPanelAvailable = true
 
     private let actionKey: String = kSemanticHistoryActionKey
     private let editorKey: String = kSemanticHistoryEditorKey
@@ -175,6 +177,8 @@ final class SemanticHistoryControllerTests: XCTestCase, iTermObject, iTermSemant
         controller.delegate = self
         coprocessCommand = nil
         sentText = nil
+        filesPanelPath = nil
+        filesPanelAvailable = true
     }
 
     override func tearDown() {
@@ -197,6 +201,11 @@ final class SemanticHistoryControllerTests: XCTestCase, iTermObject, iTermSemant
 
     func semanticHistorySendText(_ text: String!) {
         sentText = text
+    }
+
+    func semanticHistoryOpenFile(inFilesPanel path: String!) -> Bool {
+        filesPanelPath = path
+        return filesPanelAvailable
     }
 
     // MARK: - Helpers
@@ -300,6 +309,43 @@ final class SemanticHistoryControllerTests: XCTestCase, iTermObject, iTermSemant
             return URL(string: "\(scheme)://open?url=file://\(path)&line=\(lineNumber)")
         }
         return URL(string: "\(scheme)://open?url=file://\(path)")
+    }
+
+    // MARK: - Markdown opens in the Files panel
+
+    func testAbsoluteMarkdownPathOpensInFilesPanel() {
+        let path = "/Users/someone/code/project/implementation-plan.md"
+        controller.fakeFileManager.files.insert(path)
+        controller.prefs = [actionKey: editorAction, editorKey: vsCodeIdentifier]
+
+        XCTAssertTrue(cleanAndOpen(path, workingDirectory: workingDirectory, substitutions: [:]))
+
+        XCTAssertEqual(filesPanelPath, path)
+        XCTAssertNil(controller.openedURL)
+        XCTAssertNil(controller.openedFile)
+    }
+
+    func testTildeMarkdownPathOpensInFilesPanel() {
+        let expanded = NSHomeDirectory() + "/code/project/tracker.md"
+        controller.fakeFileManager.files.insert(expanded)
+        controller.prefs = [actionKey: bestEditorAction]
+
+        XCTAssertTrue(cleanAndOpen("~/code/project/tracker.md", workingDirectory: workingDirectory, substitutions: [:]))
+
+        XCTAssertEqual(filesPanelPath, expanded)
+        XCTAssertNil(controller.openedFile)
+    }
+
+    func testMarkdownFallsBackWhenFilesPanelUnavailable() {
+        let path = "/Users/someone/notes.md"
+        controller.fakeFileManager.files.insert(path)
+        controller.prefs = [actionKey: bestEditorAction]
+        filesPanelAvailable = false
+
+        XCTAssertTrue(cleanAndOpen(path, workingDirectory: workingDirectory, substitutions: [:]))
+
+        XCTAssertEqual(filesPanelPath, path)
+        XCTAssertEqual(controller.openedFile, path)
     }
 
     // MARK: - Get Full Path

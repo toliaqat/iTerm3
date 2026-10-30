@@ -22,7 +22,7 @@ final class iTermTabGroup: NSObject, PSMTabGroup {
     // Set when the group is a project: the folder its tabs are about.
     @objc let projectPath: String?
 
-    @objc init(uniqueIdentifier: String, name: String, color: NSColor, projectPath: String?) {
+    @objc init(uniqueIdentifier: String, name: String, color: NSColor, projectPath: String? = nil) {
         self.uniqueIdentifier = uniqueIdentifier
         self.name = name
         self.color = color
