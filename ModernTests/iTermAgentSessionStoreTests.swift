@@ -82,4 +82,23 @@ final class iTermAgentSessionStoreTests: XCTestCase {
         XCTAssertEqual(iTermAgentSessionsPanel.ageString(since: now.addingTimeInterval(-3 * 86400), now: now), "3d ago")
         XCTAssertEqual(iTermAgentSessionsPanel.ageString(since: now.addingTimeInterval(-21 * 86400), now: now), "3w ago")
     }
+
+    func testGroupsByWindowProjectThenProjectRoot() {
+        let now = Date()
+        func session(_ id: String, _ directory: String?, root: String? = nil) -> iTermAgentSession {
+            return iTermAgentSession(kind: .copilot, sessionID: id, title: id, workingDirectory: directory, lastActive: now, projectRoot: root ?? directory)
+        }
+        let sessions = [
+            session("a", "/work/app/sub"),
+            session("b", "/repo/lib", root: "/repo"),
+            session("c", "/work/app"),
+            session("d", nil),
+            session("e", "/repo", root: "/repo"),
+        ]
+        let project = iTermTabGroup(uniqueIdentifier: "p", name: "App", color: .red, projectPath: "/work/app")
+        let groups = iTermAgentSessionGroup.groups(for: sessions, projects: [project])
+        XCTAssertEqual(groups.map(\.name), ["App", "repo", "Unknown Folder"])
+        XCTAssertEqual(groups.map { $0.sessions.map(\.sessionID) }, [["a", "c"], ["b", "e"], ["d"]])
+        XCTAssertEqual(groups[0].color, .red)
+    }
 }

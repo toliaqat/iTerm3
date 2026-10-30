@@ -9366,6 +9366,11 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
 // A row in the left tab bar's agent sessions panel was clicked. Opens a tab in
 // the session's folder and types the command that resumes it, so the shell
 // remains when the agent exits.
+- (NSArray<iTermTabGroup *> *)rootTerminalViewProjects {
+    [self syncProjectsFromTabs];
+    return [[_projects copy] autorelease] ?: @[];
+}
+
 - (void)rootTerminalViewOpenAgentSession:(iTermAgentSession *)agentSession {
     NSMutableDictionary *profile = [[[[ProfileModel sharedInstance] defaultBookmark] mutableCopy] autorelease];
     if (!profile) {
@@ -9763,26 +9768,10 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
     [self finalizeTabGroupMembershipChangeForTab:tab];
 }
 
-// Cycle a small system palette so consecutive new groups look distinct.
+// Cycle the palette so consecutive new groups look distinct.
 - (NSColor *)nextTabGroupColor {
-    static NSArray<NSColor *> *palette;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        palette = [@[
-            [NSColor colorFromHexString:@"#5b8def"],  // blue
-            [NSColor colorFromHexString:@"#9b7bea"],  // violet
-            [NSColor colorFromHexString:@"#3fb68b"],  // green
-            [NSColor colorFromHexString:@"#e5a13a"],  // amber
-            [NSColor colorFromHexString:@"#3ab0c9"],  // cyan
-            [NSColor colorFromHexString:@"#e06c75"],  // rose
-            [NSColor colorFromHexString:@"#d9779f"],  // pink
-        ] retain];
-    });
+    NSArray<NSColor *> *palette = iTermTabGroup.palette;
     NSUInteger index = [self tabGroupsInWindow].count % palette.count;
-    // System colors (systemBlueColor, ...) are catalog colors with no direct
-    // -colorSpace; the tab color swatch view calls -colorSpace when comparing,
-    // which throws for catalog colors. Store the group color in a concrete color
-    // space like tab colors are, so the picker can use it safely.
     return [palette[index] it_colorInDefaultColorSpace];
 }
 

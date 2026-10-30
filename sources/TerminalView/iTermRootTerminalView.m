@@ -1925,6 +1925,7 @@ static NSColor *iTermWindowBorderColorFromSetting(NSString *setting) {
     _agentSessionsPanel.backgroundColor = [self.delegate rootTerminalViewTabBarBackgroundColorIgnoringTabColor:YES] ?: [NSColor windowBackgroundColor];
     _agentSessionsPanel.textColor = [self.delegate rootTerminalViewTabBarTextColorForTitle] ?: [NSColor labelColor];
     _agentSessionsPanel.hidden = NO;
+    [_agentSessionsPanel projectsDidChange];
     NSRect remainder = tabBarFrame;
     remainder.origin.y += panelHeight;
     remainder.size.height -= panelHeight;
@@ -1941,6 +1942,13 @@ static NSColor *iTermWindowBorderColorFromSetting(NSString *setting) {
     if ([self.delegate respondsToSelector:@selector(rootTerminalViewOpenAgentSession:)]) {
         [self.delegate rootTerminalViewOpenAgentSession:session];
     }
+}
+
+- (NSArray<iTermTabGroup *> *)agentSessionsPanelProjects:(iTermAgentSessionsPanel *)panel {
+    if ([self.delegate respondsToSelector:@selector(rootTerminalViewProjects)]) {
+        return [self.delegate rootTerminalViewProjects] ?: @[];
+    }
+    return @[];
 }
 
 - (void)updateLeftTabBarDragHandleForTabBarFrame:(CGRect)tabBarFrame {

@@ -11,6 +11,7 @@
 #import "VT100GridTypes.h"
 
 @class iTermAgentSession;
+@class iTermTabGroup;
 @class iTermImageView;
 @class iTermRootTerminalView;
 @class iTermStatusBarViewController;
@@ -88,6 +89,7 @@
 @optional
 // A row in the agent sessions panel beneath a left tab bar was clicked.
 - (void)rootTerminalViewOpenAgentSession:(iTermAgentSession *)session;
+- (NSArray<iTermTabGroup *> *)rootTerminalViewProjects;
 @end
 
 extern const NSInteger iTermRootTerminalViewWindowNumberLabelMargin;

@@ -29,4 +29,21 @@ final class iTermTabGroup: NSObject, PSMTabGroup {
         self.projectPath = projectPath
         super.init()
     }
+
+    // Colors cycled through for new groups. Concrete sRGB colors rather than
+    // system catalog colors, which the tab color picker can't compare.
+    @objc static let palette: [NSColor] = [
+        0x5b8def,  // blue
+        0x9b7bea,  // violet
+        0x3fb68b,  // green
+        0xe5a13a,  // amber
+        0x3ab0c9,  // cyan
+        0xe06c75,  // rose
+        0xd9779f,  // pink
+    ].map { rgb in
+        NSColor(srgbRed: CGFloat((rgb >> 16) & 0xff) / 255,
+                green: CGFloat((rgb >> 8) & 0xff) / 255,
+                blue: CGFloat(rgb & 0xff) / 255,
+                alpha: 1)
+    }
 }

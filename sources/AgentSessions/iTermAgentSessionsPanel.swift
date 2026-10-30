@@ -12,6 +12,8 @@ import AppKit
 protocol iTermAgentSessionsPanelDelegate: AnyObject {
     func agentSessionsPanelDidChangeHeight(_ panel: iTermAgentSessionsPanel)
     func agentSessionsPanel(_ panel: iTermAgentSessionsPanel, openSession session: iTermAgentSession)
+    // The window's projects. A session in a project's folder is listed under it.
+    func agentSessionsPanelProjects(_ panel: iTermAgentSessionsPanel) -> [iTermTabGroup]
 }
 
 @objc(iTermAgentSessionsPanel)
@@ -22,6 +24,9 @@ final class iTermAgentSessionsPanel: NSView {
     private static let resizeStripHeight: CGFloat = 5
     private static let collapsedKey = "NoSyncAgentSessionsPanelCollapsed"
     private static let heightKey = "NoSyncAgentSessionsPanelHeight"
+    private static let collapsedProjectsKey = "NoSyncAgentSessionsCollapsedProjects"
+    private static let groupHeaderRowHeight: CGFloat = 30
+    private static let sessionRowHeight: CGFloat = 36
 
     @objc weak var delegate: iTermAgentSessionsPanelDelegate?
 
@@ -66,6 +71,8 @@ final class iTermAgentSessionsPanel: NSView {
     private let tableView = NSTableView()
     private let emptyLabel = NSTextField(labelWithString: "")
     private var sessions = [iTermAgentSession]()
+    private var rows = [iTermAgentSessionsRow]()
+    private var projectsSignature = ""
     private var timer: Timer?
     private var dragStart: (mouseY: CGFloat, height: CGFloat)?
 
@@ -138,7 +145,7 @@ final class iTermAgentSessionsPanel: NSView {
         tableView.headerView = nil
         tableView.style = .sourceList
         tableView.backgroundColor = .clear
-        tableView.rowHeight = 36
+        tableView.rowHeight = Self.sessionRowHeight
         tableView.intercellSpacing = NSSize(width: 0, height: 0)
         tableView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         tableView.dataSource = self
@@ -167,6 +174,7 @@ final class iTermAgentSessionsPanel: NSView {
                                                name: iTermAgentSessionStore.didUpdateNotification,
                                                object: nil)
         sessions = iTermAgentSessionStore.shared.sessions
+        rebuildRows()
         applyTextColor()
         updateChevron()
         updateCount()
@@ -255,9 +263,27 @@ final class iTermAgentSessionsPanel: NSView {
 
     @objc private func storeDidUpdate(_ notification: Notification) {
         sessions = iTermAgentSessionStore.shared.sessions
-        tableView.reloadData()
+        rebuildRows()
         updateCount()
         needsLayout = true
+    }
+
+    // Call when the window's projects may have changed.
+    @objc func projectsDidChange() {
+        guard Self.signature(of: currentProjects()) != projectsSignature else {
+            return
+        }
+        rebuildRows()
+    }
+
+    private static func signature(of projects: [iTermTabGroup]) -> String {
+        return projects.map { project in
+            [project.uniqueIdentifier, project.name, project.projectPath ?? "", project.color.description].joined(separator: "\u{1}")
+        }.joined(separator: "\u{2}")
+    }
+
+    private func currentProjects() -> [iTermTabGroup] {
+        return (delegate?.agentSessionsPanelProjects(self) ?? []).filter { !($0.projectPath ?? "").isEmpty }
     }
 
     @objc private func reload(_ sender: Any?) {
@@ -329,14 +355,57 @@ final class iTermAgentSessionsPanel: NSView {
         dragStart = nil
     }
 
+    // MARK: - Grouping
+
+    private var collapsedProjects: Set<String> {
+        get { Set(iTermUserDefaults.userDefaults().stringArray(forKey: Self.collapsedProjectsKey) ?? []) }
+        set { iTermUserDefaults.userDefaults().set(Array(newValue).sorted(), forKey: Self.collapsedProjectsKey) }
+    }
+
+    private func toggleGroup(_ group: iTermAgentSessionGroup) {
+        var collapsed = collapsedProjects
+        if collapsed.contains(group.key) {
+            collapsed.remove(group.key)
+        } else {
+            collapsed.insert(group.key)
+        }
+        collapsedProjects = collapsed
+        rebuildRows()
+    }
+
+    private func rebuildRows() {
+        let projects = currentProjects()
+        projectsSignature = Self.signature(of: projects)
+        let groups = iTermAgentSessionGroup.groups(for: sessions, projects: projects)
+        let collapsed = collapsedProjects
+        var result = [iTermAgentSessionsRow]()
+        for group in groups {
+            group.collapsed = collapsed.contains(group.key)
+            result.append(.header(group))
+            guard !group.collapsed else {
+                continue
+            }
+            for (i, session) in group.sessions.enumerated() {
+                result.append(.session(session, isLast: i == group.sessions.count - 1, group: group))
+            }
+        }
+        rows = result
+        tableView.reloadData()
+    }
+
     // MARK: - Actions
 
     @objc private func rowClicked(_ sender: Any?) {
         let row = tableView.clickedRow
-        guard row >= 0, row < sessions.count else {
+        guard row >= 0, row < rows.count else {
             return
         }
-        delegate?.agentSessionsPanel(self, openSession: sessions[row])
+        switch rows[row] {
+        case .header(let group):
+            toggleGroup(group)
+        case .session(let session, _, _):
+            delegate?.agentSessionsPanel(self, openSession: session)
+        }
         tableView.deselectAll(nil)
     }
 
@@ -356,10 +425,10 @@ final class iTermAgentSessionsPanel: NSView {
 
     private var clickedSession: iTermAgentSession? {
         let row = tableView.clickedRow
-        guard row >= 0, row < sessions.count else {
+        guard row >= 0, row < rows.count, case .session(let session, _, _) = rows[row] else {
             return nil
         }
-        return sessions[row]
+        return session
     }
 
     @objc private func resumeFromMenu(_ sender: Any?) {
@@ -407,15 +476,193 @@ final class iTermAgentSessionsPanel: NSView {
 
 extension iTermAgentSessionsPanel: NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView: NSTableView) -> Int {
-        return sessions.count
+        return rows.count
+    }
+
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        switch rows[row] {
+        case .header: return Self.groupHeaderRowHeight
+        case .session: return Self.sessionRowHeight
+        }
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        if case .session = rows[row] {
+            return true
+        }
+        return false
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let identifier = NSUserInterfaceItemIdentifier("AgentSessionCell")
-        let cell = (tableView.makeView(withIdentifier: identifier, owner: self) as? iTermAgentSessionCellView)
-            ?? iTermAgentSessionCellView(identifier: identifier)
-        cell.configure(session: sessions[row], textColor: textColor)
-        return cell
+        let dark = effectiveAppearance.it_isDark
+        switch rows[row] {
+        case .header(let group):
+            let identifier = NSUserInterfaceItemIdentifier("AgentSessionGroupHeader")
+            let cell = (tableView.makeView(withIdentifier: identifier, owner: self) as? iTermAgentSessionGroupHeaderView)
+                ?? iTermAgentSessionGroupHeaderView(identifier: identifier)
+            cell.configure(group: group, dark: dark)
+            return cell
+        case .session(let session, let isLast, let group):
+            let identifier = NSUserInterfaceItemIdentifier("AgentSessionCell")
+            let cell = (tableView.makeView(withIdentifier: identifier, owner: self) as? iTermAgentSessionCellView)
+                ?? iTermAgentSessionCellView(identifier: identifier)
+            cell.configure(session: session, group: group, isLast: isLast, textColor: textColor, dark: dark)
+            return cell
+        }
+    }
+}
+
+private enum iTermAgentSessionsRow {
+    case header(iTermAgentSessionGroup)
+    case session(iTermAgentSession, isLast: Bool, group: iTermAgentSessionGroup)
+}
+
+// Sessions that share a project: a project of the window that contains their
+// folder, or else their repository (or folder).
+final class iTermAgentSessionGroup {
+    let key: String
+    let name: String
+    let path: String?
+    let color: NSColor
+    var sessions = [iTermAgentSession]()
+    var collapsed = false
+
+    init(key: String, name: String, path: String?, color: NSColor) {
+        self.key = key
+        self.name = name
+        self.path = path
+        self.color = color
+    }
+
+    // Groups ordered by their most recent session. `sessions` must already be
+    // ordered most recent first.
+    static func groups(for sessions: [iTermAgentSession], projects: [iTermTabGroup]) -> [iTermAgentSessionGroup] {
+        let projectPaths = projects.map { (project: $0, path: ($0.projectPath! as NSString).standardizingPath) }
+        var byKey = [String: iTermAgentSessionGroup]()
+        var ordered = [iTermAgentSessionGroup]()
+        for session in sessions {
+            let group: iTermAgentSessionGroup
+            let directory = session.workingDirectory.map { ($0 as NSString).standardizingPath }
+            let project = directory.flatMap { directory in
+                projectPaths
+                    .filter { directory == $0.path || directory.hasPrefix($0.path.hasSuffix("/") ? $0.path : $0.path + "/") }
+                    .max { $0.path.count < $1.path.count }
+            }
+            let key = project.map { "project:" + $0.path } ?? session.projectRoot.map { ($0 as NSString).standardizingPath } ?? ""
+            if let existing = byKey[key] {
+                group = existing
+            } else if let project {
+                group = iTermAgentSessionGroup(key: key, name: project.project.name, path: project.path, color: project.project.color)
+                byKey[key] = group
+                ordered.append(group)
+            } else {
+                group = iTermAgentSessionGroup(key: key, name: displayName(for: key), path: key.isEmpty ? nil : key, color: color(for: key))
+                byKey[key] = group
+                ordered.append(group)
+            }
+            group.sessions.append(session)
+        }
+        return ordered
+    }
+
+    private static func displayName(for path: String) -> String {
+        if path.isEmpty {
+            return String(localized: "AgentSessions.UnknownFolder", defaultValue: "Unknown Folder", comment: "Group of agent sessions whose working folder isn’t known")
+        }
+        if path == NSHomeDirectory() {
+            return "~"
+        }
+        return (path as NSString).lastPathComponent
+    }
+
+    // A stable palette color so a folder keeps its color between launches.
+    private static func color(for path: String) -> NSColor {
+        let palette = iTermTabGroup.palette
+        var hash: UInt64 = 5381
+        for byte in path.utf8 {
+            hash = (hash &* 33) &+ UInt64(byte)
+        }
+        return palette[Int(hash % UInt64(palette.count))]
+    }
+
+    // The group color as text or strokes: brightened on a dark background and
+    // darkened on a light one, like the tab bar's group headers.
+    static func accentColor(_ color: NSColor, dark: Bool) -> NSColor {
+        let srgb = color.usingColorSpace(.sRGB) ?? color
+        if dark {
+            return srgb.blended(withFraction: 0.15, of: .white) ?? srgb
+        }
+        return srgb.blended(withFraction: 0.3, of: .black) ?? srgb
+    }
+}
+
+// A project's header: a tinted rounded block with its name, session count, and
+// a disclosure chevron, matching the tab bar's group headers.
+private final class iTermAgentSessionGroupHeaderView: NSTableCellView {
+    private let label = NSTextField(labelWithString: "")
+    private let countLabel = NSTextField(labelWithString: "")
+    private let chevron = NSImageView()
+    private var color = NSColor.clear
+    private var dark = false
+
+    init(identifier: NSUserInterfaceItemIdentifier) {
+        super.init(frame: .zero)
+        self.identifier = identifier
+        label.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+        label.lineBreakMode = .byTruncatingTail
+        countLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        countLabel.alignment = .right
+        chevron.imageScaling = .scaleProportionallyDown
+        for view in [label, countLabel, chevron] {
+            addSubview(view)
+        }
+    }
+
+    required init?(coder: NSCoder) {
+        it_fatalError("init(coder:) has not been implemented")
+    }
+
+    func configure(group: iTermAgentSessionGroup, dark: Bool) {
+        color = group.color
+        self.dark = dark
+        let accent = iTermAgentSessionGroup.accentColor(group.color, dark: dark)
+        label.stringValue = group.name
+        label.textColor = accent
+        countLabel.stringValue = "\(group.sessions.count)"
+        countLabel.textColor = accent.withAlphaComponent(0.8)
+        let symbol = group.collapsed ? SFSymbol.chevronRight : SFSymbol.chevronDown
+        chevron.image = NSImage.it_image(forSymbolName: symbol.rawValue, accessibilityDescription: nil)
+        chevron.contentTintColor = accent
+        toolTip = group.path.map { ($0 as NSString).abbreviatingWithTildeInPath }
+        needsDisplay = true
+        needsLayout = true
+    }
+
+    private var blockRect: NSRect {
+        return NSInsetRect(bounds, 4, 2)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        color.withAlphaComponent(dark ? 0.22 : 0.16).setFill()
+        NSBezierPath(roundedRect: blockRect, xRadius: 6, yRadius: 6).fill()
+    }
+
+    override func layout() {
+        super.layout()
+        let block = blockRect
+        let midY = block.midY
+        chevron.frame = NSRect(x: block.maxX - 18, y: midY - 5, width: 10, height: 10)
+        countLabel.sizeToFit()
+        let countSize = countLabel.frame.size
+        countLabel.frame = NSRect(x: chevron.frame.minX - 6 - countSize.width,
+                                  y: midY - countSize.height / 2,
+                                  width: countSize.width,
+                                  height: countSize.height)
+        let labelHeight = label.intrinsicContentSize.height
+        label.frame = NSRect(x: block.minX + 8,
+                             y: midY - labelHeight / 2,
+                             width: max(0, countLabel.frame.minX - block.minX - 14),
+                             height: labelHeight)
     }
 }
 
@@ -441,6 +688,9 @@ private final class iTermAgentSessionCellView: NSTableCellView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let ageLabel = NSTextField(labelWithString: "")
     private let detailLabel = NSTextField(labelWithString: "")
+    private var railColor = NSColor.clear
+    private var isLast = false
+    private static let leadingInset: CGFloat = 18
 
     init(identifier: NSUserInterfaceItemIdentifier) {
         super.init(frame: .zero)
@@ -461,14 +711,27 @@ private final class iTermAgentSessionCellView: NSTableCellView {
         it_fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(session: iTermAgentSession, textColor: NSColor) {
+    func configure(session: iTermAgentSession,
+                   group: iTermAgentSessionGroup,
+                   isLast: Bool,
+                   textColor: NSColor,
+                   dark: Bool) {
+        railColor = iTermAgentSessionGroup.accentColor(group.color, dark: dark)
+        self.isLast = isLast
+        needsDisplay = true
         titleLabel.stringValue = session.title
         titleLabel.textColor = textColor
         ageLabel.stringValue = iTermAgentSessionsPanel.ageString(since: session.lastActive)
         ageLabel.textColor = textColor.withAlphaComponent(0.55)
+        // The group names the project, so only show a folder beneath it.
         var detail = session.agentName
-        if let directory = session.workingDirectory {
-            detail += " · " + (directory as NSString).abbreviatingWithTildeInPath
+        if let directory = session.workingDirectory.map({ ($0 as NSString).standardizingPath }),
+           directory != group.path {
+            if let root = group.path, directory.hasPrefix(root + "/") {
+                detail += " · " + String(directory.dropFirst(root.count + 1))
+            } else {
+                detail += " · " + (directory as NSString).abbreviatingWithTildeInPath
+            }
         }
         detailLabel.stringValue = detail
         detailLabel.textColor = textColor.withAlphaComponent(0.55)
@@ -478,9 +741,18 @@ private final class iTermAgentSessionCellView: NSTableCellView {
         needsLayout = true
     }
 
+    // A thin rail along the group's sessions, like the tab bar's group rail.
+    override func draw(_ dirtyRect: NSRect) {
+        let bottomInset: CGFloat = isLast ? 4 : 0
+        let rail = NSRect(x: 6, y: bottomInset, width: 2.5, height: bounds.height - bottomInset)
+        railColor.setFill()
+        NSBezierPath(roundedRect: rail, xRadius: 1.25, yRadius: 1.25).fill()
+    }
+
     override func layout() {
         super.layout()
         let inset: CGFloat = 10
+        let leading = Self.leadingInset
         let width = bounds.width
         ageLabel.sizeToFit()
         let ageWidth = ageLabel.frame.width
@@ -490,7 +762,7 @@ private final class iTermAgentSessionCellView: NSTableCellView {
         // NSTableCellView isn't flipped, so place the title above the detail.
         let titleY = bounds.height - top - titleHeight
         ageLabel.frame = NSRect(x: width - inset - ageWidth, y: titleY, width: ageWidth, height: titleHeight)
-        titleLabel.frame = NSRect(x: inset, y: titleY, width: max(0, ageLabel.frame.minX - inset - 6), height: titleHeight)
-        detailLabel.frame = NSRect(x: inset, y: titleY - detailHeight, width: max(0, width - 2 * inset), height: detailHeight)
+        titleLabel.frame = NSRect(x: leading, y: titleY, width: max(0, ageLabel.frame.minX - leading - 6), height: titleHeight)
+        detailLabel.frame = NSRect(x: leading, y: titleY - detailHeight, width: max(0, width - leading - inset), height: detailHeight)
     }
 }

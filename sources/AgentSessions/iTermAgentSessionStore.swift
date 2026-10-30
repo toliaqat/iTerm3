@@ -20,13 +20,36 @@ final class iTermAgentSession: NSObject {
     let title: String
     let workingDirectory: String?
     let lastActive: Date
+    // The repository containing the working directory, or the working directory
+    // itself when it isn't in one. Sessions are grouped by this.
+    let projectRoot: String?
 
-    init(kind: Kind, sessionID: String, title: String, workingDirectory: String?, lastActive: Date) {
+    init(kind: Kind,
+         sessionID: String,
+         title: String,
+         workingDirectory: String?,
+         lastActive: Date,
+         projectRoot: String? = nil) {
         self.kind = kind
         self.sessionID = sessionID
         self.title = title
         self.workingDirectory = workingDirectory
         self.lastActive = lastActive
+        self.projectRoot = projectRoot ?? workingDirectory.flatMap { Self.repositoryRoot(containing: $0) } ?? workingDirectory
+    }
+
+    // The nearest folder at or above `path` that has a .git entry.
+    static func repositoryRoot(containing path: String) -> String? {
+        var current = (path as NSString).standardizingPath
+        let home = NSHomeDirectory()
+        while current != "/" && !current.isEmpty && current != home {
+            let git = (current as NSString).appendingPathComponent(".git")
+            if FileManager.default.fileExists(atPath: git) {
+                return current
+            }
+            current = (current as NSString).deletingLastPathComponent
+        }
+        return nil
     }
 
     var agentName: String {
@@ -231,7 +254,8 @@ extension iTermAgentSessionStore {
                                  sessionID: id,
                                  title: title,
                                  workingDirectory: fields["cwd"],
-                                 lastActive: lastActive)
+                                 lastActive: lastActive,
+                                 projectRoot: fields["git_root"].flatMap { $0.isEmpty ? nil : $0 })
     }
 
     fileprivate static func unquotedYAMLScalar(_ value: String) -> String {
