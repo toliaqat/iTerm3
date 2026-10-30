@@ -895,6 +895,7 @@ typedef NS_ENUM(int, iTermShouldHaveTitleSeparator) {
                                                                                       bundle:[NSBundle bundleForClass:self.class]];
     }
     [self addShortcutAccessorViewControllerToTitleBarIfNeeded];
+    [self addFilesAccessoryViewControllerToTitleBarIfNeeded];
     _shortcutAccessoryViewController.ordinal = number_ + 1;
     _shortcutAccessoryViewController.titlebarStyle = [iTermWindowShortcutLabelTitlebarAccessoryViewController titlebarStyleForWindowType:self.windowType];
 
@@ -1136,6 +1137,7 @@ ITERM_WEAKLY_REFERENCEABLE
     [lastArrangement_ release];
     [_autoCommandHistorySessionGuid release];
     [_shortcutAccessoryViewController release];
+    [_filesAccessoryViewController release];
     [_titleBarAccessoryTabBarViewController release];
     [_didEnterLionFullscreen release];
     [_desiredTitle release];
@@ -1338,6 +1340,7 @@ ITERM_WEAKLY_REFERENCEABLE
 
 - (void)toggleToolbeltVisibilityWithSideEffects:(BOOL)sideEffects {
     _contentView.shouldShowToolbelt = !_contentView.shouldShowToolbelt;
+    _filesAccessoryViewController.isOn = _contentView.shouldShowToolbelt;
     BOOL didResizeWindow = NO;
     if (_contentView.shouldShowToolbelt) {
         if (![self anyFullScreen]) {
@@ -1362,6 +1365,30 @@ ITERM_WEAKLY_REFERENCEABLE
         [[self uniqueTmuxControllers] enumerateObjectsUsingBlock:^(TmuxController *controller, NSUInteger idx, BOOL * _Nonnull stop) {
             [controller savePerWindowSettings];
         }];
+    }
+}
+
+// The title bar's Files button. Showing makes sure the Files tool is in the toolbelt.
+- (IBAction)toggleFilesPanel:(id)sender {
+    if (!_contentView.shouldShowToolbelt &&
+        ![iTermToolbeltView shouldShowTool:kFilesToolName profileType:self.toolbeltProfileType]) {
+        [iTermToolbeltView toggleShouldShowTool:kFilesToolName];
+    }
+    [self toggleToolbeltVisibility:sender];
+}
+
+- (void)addFilesAccessoryViewControllerToTitleBarIfNeeded {
+    if ((self.window.styleMask & NSWindowStyleMaskTitled) == 0 || ![self shouldHaveShortcutAccessory]) {
+        return;
+    }
+    if (!_filesAccessoryViewController) {
+        _filesAccessoryViewController = [[iTermFilesTitlebarAccessoryViewController alloc] initWithTarget:self
+                                                                                                   action:@selector(toggleFilesPanel:)];
+    }
+    _filesAccessoryViewController.isOn = _contentView.shouldShowToolbelt;
+    if (![_titlebarAccessoryNanny.viewControllers containsObject:_filesAccessoryViewController]) {
+        [_filesAccessoryViewController view];
+        [_titlebarAccessoryNanny add:_filesAccessoryViewController];
     }
 }
 
@@ -4265,6 +4292,7 @@ typedef NS_ENUM(NSInteger, iTermCloseSubject) {
     self.scope.windowTitleOverrideFormat = arrangement[TERMINAL_ARRANGEMENT_TITLE_OVERRIDE];
 
     _contentView.shouldShowToolbelt = [arrangement[TERMINAL_ARRANGEMENT_HAS_TOOLBELT] boolValue];
+    _filesAccessoryViewController.isOn = _contentView.shouldShowToolbelt;
     [_contentView constrainToolbeltWidth];
     [_contentView setToolbeltProportions:arrangement[TERMINAL_ARRANGEMENT_TOOLBELT_PROPORTIONS]];
     [_contentView.toolbelt restoreFromState:arrangement[TERMINAL_ARRANGEMENT_TOOLBELT]];
@@ -9190,6 +9218,9 @@ hidingToolbeltShouldResizeWindow:(BOOL)hidingToolbeltShouldResizeWindow
 // PTYTabDelegate: a new tab learned its first working directory. Put it in
 // the project for that folder, once; after that the user decides.
 - (void)tab:(PTYTab *)tab sessionCurrentDirectoryDidChange:(PTYSession *)session {
+    if (tab == self.currentTab && session == tab.activeSession) {
+        [_contentView.toolbelt.filesView currentDirectoryDidChange];
+    }
     if (!tab.pendingProjectAutoJoin) {
         return;
     }
@@ -14072,6 +14103,7 @@ static BOOL iTermApproximatelyEqualRects(NSRect lhs, NSRect rhs, double epsilon)
     self.tabBarControl.insets = [self tabBarInsets];
 
     [self addShortcutAccessorViewControllerToTitleBarIfNeeded];
+    [self addFilesAccessoryViewControllerToTitleBarIfNeeded];
 }
 
 - (void)setFrameSize:(NSSize)newSize
@@ -16853,6 +16885,10 @@ typedef NS_ENUM(NSUInteger, iTermBroadcastCommand) {
 
 - (NSArray<id<iTermGenericNamedMarkReading>> *)toolbeltNamedMarks {
     return self.currentSession.namedMarks;
+}
+
+- (NSString *)toolbeltCurrentWorkingDirectory {
+    return self.currentSession.currentLocalWorkingDirectory;
 }
 
 - (pid_t)toolbeltCurrentShellProcessId {

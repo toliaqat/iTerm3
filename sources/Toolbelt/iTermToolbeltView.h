@@ -8,6 +8,7 @@
 @class ToolCapturedOutputView;
 @class ToolCommandHistoryView;
 @class ToolDirectoriesView;
+@class ToolFiles;
 @class ToolJobs;
 @class ToolNamedMarks;
 @class ToolStatus;
@@ -21,6 +22,7 @@ extern NSString *const kJobsToolName;
 extern NSString *const kNotesToolName;
 extern NSString *const kPasteHistoryToolName;
 extern NSString *const kProfilesToolName;
+extern NSString *const kFilesToolName;
 extern NSString *const kDynamicToolsDidChange;
 extern NSString *const kStatusToolName;
 
@@ -33,6 +35,7 @@ extern NSString *const kToolbeltShouldHide;
 
 @property(nonatomic, assign) id<iTermToolbeltViewDelegate> delegate;
 @property(nonatomic, readonly) ToolDirectoriesView *directoriesView;
+@property(nonatomic, readonly) ToolFiles *filesView;
 @property(nonatomic, readonly) ToolCapturedOutputView *capturedOutputView;
 @property(nonatomic, readonly) ToolJobs *jobsView;
 @property(nonatomic, retain) NSDictionary *proportions;

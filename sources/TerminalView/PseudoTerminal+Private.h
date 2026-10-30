@@ -10,6 +10,7 @@
 
 @class iTermRootTerminalView;
 @class iTermWindowShortcutLabelTitlebarAccessoryViewController;
+@class iTermFilesTitlebarAccessoryViewController;
 @class iTermTitlebarAccessoryNanny;
 @class iTermWindowInitialPositioner;
 @class iTermWindowLocationLockController;
@@ -97,6 +98,7 @@ extern NSString *const TERMINAL_ARRANGEMENT_LAYOUT_LOCKED;
     BOOL _updatingWindowType;  // updateWindowType is not reentrant
 
     iTermWindowShortcutLabelTitlebarAccessoryViewController *_shortcutAccessoryViewController;
+    iTermFilesTitlebarAccessoryViewController *_filesAccessoryViewController;
 
     // When you enter fullscreen mode, the old use transparency setting is
     // saved, and then restored when you exit FS unless it was changed

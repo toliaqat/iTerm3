@@ -53,6 +53,8 @@ NSString *const kNamedMarksToolName = @"Named Marks";
 NSString *const kStatusToolName = @"Session Status";
 // Localization unneeded
 NSString *const kCodeciergeToolName = @"Codecierge";
+// Localization unneeded
+NSString *const kFilesToolName = @"Files";
 
 NSString *const kToolbeltShouldHide = @"kToolbeltShouldHide";
 
@@ -104,6 +106,7 @@ static NSString *const kDynamicToolURL = @"URL";
     [iTermToolbeltView registerToolWithName:kProfilesToolName withClass:[ToolProfiles class]];
     [iTermToolbeltView registerToolWithName:kSnippetsToolName withClass:[iTermToolSnippets class]];
     [iTermToolbeltView registerToolWithName:kCodeciergeToolName withClass:[iTermToolCodecierge class]];
+    [iTermToolbeltView registerToolWithName:kFilesToolName withClass:[ToolFiles class]];
 
     NSDictionary<NSString *, NSDictionary *> *dynamicTools = [[iTermUserDefaults userDefaults] objectForKey:kDynamicToolsKey];
     [dynamicTools enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull identifier, NSDictionary * _Nonnull dict, BOOL * _Nonnull stop) {
@@ -131,6 +134,7 @@ static NSString *const kDynamicToolURL = @"URL";
             kNamedMarksToolName: NSLocalizedStringWithDefaultValue(@"Toolbelt.Tool.NamedMarks", nil, [NSBundle mainBundle], @"Named Marks", @"Name of the Named Marks toolbelt tool"),
             kStatusToolName: NSLocalizedStringWithDefaultValue(@"Toolbelt.Tool.SessionStatus", nil, [NSBundle mainBundle], @"Session Status", @"Name of the Session Status toolbelt tool"),
             kCodeciergeToolName: NSLocalizedStringWithDefaultValue(@"Toolbelt.Tool.Codecierge", nil, [NSBundle mainBundle], @"Codecierge", @"Name of the Codecierge toolbelt tool"),
+            kFilesToolName: NSLocalizedStringWithDefaultValue(@"Toolbelt.Tool.Files", nil, [NSBundle mainBundle], @"Files", @"Name of the Files toolbelt tool, a file browser and editor"),
         };
     });
     return map[name] ?: name;
@@ -286,7 +290,7 @@ static NSString *const kDynamicToolURL = @"URL";
 
 + (NSArray *)defaultTools {
     // Localization unneeded
-    return [NSArray arrayWithObjects:@"Profiles", nil];
+    return @[ kFilesToolName ];
 }
 
 + (void)registerToolWithName:(NSString *)name withClass:(Class)c {
@@ -631,6 +635,7 @@ static NSString *const kDynamicToolURL = @"URL";
     [[self snippetsView] currentSessionDidChange];
     [[self codeciergeView] currentSessionDidChange];
     [[self namedMarksView] setNamedMarks:[self.delegate toolbeltNamedMarks]];
+    [[self filesView] currentDirectoryDidChange];
     [self updateForProfileType];
 }
 
@@ -711,6 +716,11 @@ static NSString *const kDynamicToolURL = @"URL";
 - (ToolCommandHistoryView *)commandHistoryView {
     iTermToolWrapper *wrapper = [_tools objectForKey:kCommandHistoryToolName];
     return (ToolCommandHistoryView *)wrapper.tool;
+}
+
+- (ToolFiles *)filesView {
+    iTermToolWrapper *wrapper = _tools[kFilesToolName];
+    return (ToolFiles *)wrapper.tool;
 }
 
 - (ToolNamedMarks *)namedMarksView {

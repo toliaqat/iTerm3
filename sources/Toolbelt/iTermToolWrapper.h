@@ -36,6 +36,7 @@
 - (void)toolbeltInsertText:(NSString *)text;
 - (id<VT100RemoteHostReading>)toolbeltCurrentHost;
 - (pid_t)toolbeltCurrentShellProcessId;
+- (NSString *)toolbeltCurrentWorkingDirectory;
 - (id<ProcessInfoProvider>)toolbeltCurrentShellProcessInfoProvider;
 - (id<VT100ScreenMarkReading>)toolbeltLastCommandMark;
 - (void)toolbeltDidSelectMark:(id<iTermMark>)mark;

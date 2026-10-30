@@ -9312,9 +9312,7 @@ typedef struct {
     if (session == self.activeSession) {
         [_delegate tabInvalidateProxyIcon:self];
     }
-    if (_pendingProjectAutoJoin) {
-        [_delegate tab:self sessionCurrentDirectoryDidChange:session];
-    }
+    [_delegate tab:self sessionCurrentDirectoryDidChange:session];
 }
 
 - (void)sessionCurrentHostDidChange:(PTYSession *)session {
