@@ -231,10 +231,16 @@ final class WorkgroupRestorationCoordinator: NSObject {
         // (their content is lost); the anchor remains a normal session.
         // We bail BEFORE deserializing the members so we don't create and
         // immediately abandon their sessions.
-        guard let workgroup = iTermWorkgroupModel.instance.workgroup(uniqueIdentifier: workgroupID) else {
+        guard var workgroup = iTermWorkgroupModel.instance.workgroup(uniqueIdentifier: workgroupID) else {
             RLog("WorkgroupRestoration: config \(workgroupID) is gone; peers not restored, anchor left standalone")
             return
         }
+        // Peers added while it ran come back as members too.
+        let dynamicPeers = iTermWorkgroupRestoration.decodeDynamicPeers(from: descriptor).filter { cfg in
+            cfg.parentID == workgroup.root?.uniqueIdentifier &&
+                workgroup.session(withUniqueIdentifier: cfg.uniqueIdentifier) == nil
+        }
+        workgroup.sessions.append(contentsOf: dynamicPeers)
 
         // Recreate the embedded (buried) peer members from their saved
         // arrangements. The anchor is already a live restored session.
@@ -334,7 +340,7 @@ final class WorkgroupRestorationCoordinator: NSObject {
             }
         }
 
-        iTermWorkgroupController.instance.adopt(
+        let instance = iTermWorkgroupController.instance.adopt(
             workgroup: workgroup,
             leader: leaderSession,
             instanceUniqueIdentifier: instanceID,
@@ -342,6 +348,14 @@ final class WorkgroupRestorationCoordinator: NSObject {
             gitBase: gitBase,
             peerSessionsByConfigID: peerSessions,
             nonPeerSessionsByConfigID: nonPeerSessions)
+        if let instance {
+            for cfg in dynamicPeers {
+                guard let promise = instance.peerPort.promise(forIdentifier: cfg.uniqueIdentifier) else {
+                    continue
+                }
+                instance.adoptDynamicPeer(config: cfg, promise: promise)
+            }
+        }
 
         // The anchor is the one peer that window restoration already
         // brought back as a live session, so it can't be "spawned fresh"

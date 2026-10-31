@@ -119,6 +119,11 @@ New Features:
   Copilot that can’t edit files. If you
   installed the integration before, install it
   again to get the workgroup.
+- When a Copilot session in a workgroup starts
+  other agents, they open as new modes in the
+  workgroup’s switcher instead of new tabs. Use
+  it2 session add-peer and remove-peer to do
+  the same from a script.
 - Right-clicking your own message in AI chat now
   offers Delete, which removes that message and
   everything after it. Edit, Fork, and Delete are

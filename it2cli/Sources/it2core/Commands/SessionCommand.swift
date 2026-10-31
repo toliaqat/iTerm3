@@ -29,6 +29,8 @@ struct Session: ParsableCommand {
             SetVar.self,
             AddClipping.self,
             ArchiveClippings.self,
+            AddPeer.self,
+            RemovePeer.self,
         ])
     )
 }
@@ -939,6 +941,86 @@ extension Session {
                 throw IT2Error.apiError("Failed to JSON-encode string")
             }
             return str
+        }
+    }
+}
+
+// MARK: - session add-peer / remove-peer
+
+extension Session {
+    struct AddPeer: ParsableCommand, IT2Runnable, TmuxAddressableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "add-peer",
+            abstract: "Add a session to the workgroup of a session, as a segment of its peer switcher, and print its ID.",
+            discussion: "The new session isn’t in a tab, so it isn’t in “session list”, but other commands reach it with --session."
+        )
+
+        @Argument(help: "Name shown in the peer switcher.")
+        var name: String
+
+        @Option(name: .shortAndLong, help: "Command to run (default: a login shell).")
+        var command: String?
+
+        @Flag(name: .long, help: "Switch to the new session.")
+        var activate = false
+
+        @Option(name: .shortAndLong, help: "A session in the workgroup (default: active, or the pane named by --tmux).")
+        var session: String?
+
+        @OptionGroup var tmuxOptions: TmuxPaneOptions
+
+        func run(_ ctx: IT2Context) throws {
+            let client = try ctx.makeClient()
+            defer { client.disconnect() }
+
+            guard let sessionId = try client.resolveTarget(session,
+                                                           tmuxOptions: tmuxOptions,
+                                                           ctx: ctx) else {
+                return
+            }
+            var arguments = ["name: \(jsonString(name))", "activate: \(activate)"]
+            if let command {
+                arguments.append("command: \(jsonString(command))")
+            }
+            let result = try client.invoke(
+                "iterm2.add_workgroup_peer(\(arguments.joined(separator: ", ")))",
+                sessionID: sessionId,
+                failure: "Add peer failed")
+            guard let data = result.data(using: .utf8),
+                  let id = try? JSONDecoder().decode(String.self, from: data) else {
+                throw IT2Error.apiError("Add peer returned no session ID")
+            }
+            print(id)
+        }
+    }
+
+    struct RemovePeer: ParsableCommand, IT2Runnable, TmuxAddressableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "remove-peer",
+            abstract: "End a session that add-peer added to a workgroup."
+        )
+
+        @Argument(help: "ID of the session to end.")
+        var peer: String
+
+        @Option(name: .shortAndLong, help: "A session in the workgroup (default: active, or the pane named by --tmux).")
+        var session: String?
+
+        @OptionGroup var tmuxOptions: TmuxPaneOptions
+
+        func run(_ ctx: IT2Context) throws {
+            let client = try ctx.makeClient()
+            defer { client.disconnect() }
+
+            guard let sessionId = try client.resolveTarget(session,
+                                                           tmuxOptions: tmuxOptions,
+                                                           ctx: ctx) else {
+                return
+            }
+            _ = try client.invoke(
+                "iterm2.remove_workgroup_peer(peer: \(jsonString(APIClient.normalizeSessionId(peer))))",
+                sessionID: sessionId,
+                failure: "Remove peer failed")
         }
     }
 }

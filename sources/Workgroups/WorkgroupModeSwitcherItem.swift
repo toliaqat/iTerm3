@@ -116,6 +116,10 @@ final class WorkgroupModeSwitcherItem: SessionToolbarControl {
         return identifiers[idx]
     }
 
+    var segmentCount: Int {
+        return identifiers.count
+    }
+
     override var desiredWidthRange: ClosedRange<CGFloat> {
         let natural = max(_view.fittingSize.width, 0)
         return (30.0 * CGFloat(segmentedControl.segmentCount))...natural

@@ -38,8 +38,13 @@ final class iTermWorkgroupInstance: NSObject {
     // workgroup appear can tell what created it instead of guessing.
     @objc var provenance: String?
 
-    // Config snapshot at entry time.
-    let workgroup: iTermWorkgroup
+    // Config snapshot at entry time, plus the members added since by
+    // addDynamicPeer.
+    private(set) var workgroup: iTermWorkgroup
+
+    // Config IDs of the peers added by addDynamicPeer, in order. Unlike a
+    // configured member, ending one of these removes just that peer.
+    private(set) var dynamicPeerConfigIDs: [String] = []
 
     // The peer port wired to the main session's SessionView.
     @objc let peerPort: iTermWorkgroupPeerPort
@@ -289,6 +294,9 @@ final class iTermWorkgroupInstance: NSObject {
             return false
         }()
         guard isMine else { return }
+        if removeEndedDynamicPeer(session) {
+            return
+        }
         // isTmuxClient is already false here: terminate() clears it before saying so.
         if let tmuxBinding, tmuxBinding.isConnected, session !== mainSession,
            session.tmuxPaneIfClient != nil,
@@ -308,6 +316,141 @@ final class iTermWorkgroupInstance: NSObject {
             return
         }
         exitBecauseMemberTerminated(session)
+    }
+
+    // MARK: - Peers added at runtime
+
+    enum DynamicPeerError: LocalizedError {
+        case ended
+        case onTmuxServer
+        case noActiveMember
+
+        var errorDescription: String? {
+            switch self {
+            case .ended:
+                return String(localized: "Workgroup.DynamicPeer.Ended",
+                              defaultValue: "The workgroup has ended.",
+                              comment: "Error when adding a peer to a workgroup that has ended")
+            case .onTmuxServer:
+                return String(localized: "Workgroup.DynamicPeer.Tmux",
+                              defaultValue: "Peers can’t be added to a workgroup on a tmux server.",
+                              comment: "Error when adding a peer to a workgroup whose sessions live on a tmux server")
+            case .noActiveMember:
+                return String(localized: "Workgroup.DynamicPeer.NoWindow",
+                              defaultValue: "The workgroup has no session in a window to add a peer next to.",
+                              comment: "Error when adding a peer to a workgroup none of whose sessions is in a window")
+            }
+        }
+    }
+
+    static func dynamicPeerConfig(name: String,
+                                  command: String,
+                                  rootID: String) -> iTermWorkgroupSessionConfig {
+        return iTermWorkgroupSessionConfig(uniqueIdentifier: UUID().uuidString,
+                                           parentID: rootID,
+                                           kind: .peer,
+                                           profileGUID: nil,
+                                           command: command,
+                                           urlString: "",
+                                           toolbarItems: [.modeSwitcher],
+                                           displayName: name,
+                                           mode: .regular)
+    }
+
+    // Opens a new peer running `command` (a login shell when empty) as a
+    // segment of the main peer group's switcher, without switching to it.
+    // Returns its config ID and the promise of its session.
+    func addDynamicPeer(name: String,
+                        command: String) throws -> (identifier: String, promise: iTermPromise<PTYSession>) {
+        guard !didTeardown, let mainSession, let root = workgroup.root else {
+            throw DynamicPeerError.ended
+        }
+        guard tmuxBinding == nil else {
+            throw DynamicPeerError.onTmuxServer
+        }
+        // A peer is created next to a member in a window: the spawn waits
+        // for its parent's delegate.
+        let parent = peerPort.activeSession ?? mainSession
+        guard parent.delegate != nil else {
+            throw DynamicPeerError.noActiveMember
+        }
+        let config = Self.dynamicPeerConfig(name: name, command: command, rootID: root.uniqueIdentifier)
+        RLog("iTermWorkgroupInstance.addDynamicPeer: adding \(config.uniqueIdentifier) named \(name) to \(instanceUniqueIdentifier)")
+        let promise = spawner.spawnPeer(parent: parent, config: config)
+        adoptDynamicPeer(config: config, promise: promise)
+        return (config.uniqueIdentifier, promise)
+    }
+
+    // Wires a dynamic peer's config and session into the instance. Shared by
+    // addDynamicPeer and restoration.
+    func adoptDynamicPeer(config: iTermWorkgroupSessionConfig,
+                          promise: iTermPromise<PTYSession>) {
+        if !workgroup.sessions.contains(where: { $0.uniqueIdentifier == config.uniqueIdentifier }) {
+            workgroup.sessions.append(config)
+        }
+        if !dynamicPeerConfigIDs.contains(config.uniqueIdentifier) {
+            dynamicPeerConfigIDs.append(config.uniqueIdentifier)
+        }
+        if peerPort.promise(forIdentifier: config.uniqueIdentifier) == nil {
+            peerPort.addPeer(config: config, promise: promise)
+        }
+        attachBackPointers(toEach: [promise])
+    }
+
+    // The configs of the dynamic peers, for saving with the arrangement.
+    var dynamicPeerConfigs: [iTermWorkgroupSessionConfig] {
+        return dynamicPeerConfigIDs.compactMap { id in
+            workgroup.sessions.first { $0.uniqueIdentifier == id }
+        }
+    }
+
+    // Ends a peer added by addDynamicPeer. When it's the one shown, the
+    // leader is swapped back in first. Returns false when `identifier`
+    // isn't a dynamic peer or it couldn't be swapped out.
+    @discardableResult
+    func removeDynamicPeer(identifier: String) -> Bool {
+        guard dynamicPeerConfigIDs.contains(identifier) else {
+            return false
+        }
+        if peerPort.activeSessionIdentifier == identifier {
+            guard peerPort.activate(identifier: peerPort.leaderIdentifier),
+                  peerPort.activeSessionIdentifier != identifier else {
+                RLog("iTermWorkgroupInstance.removeDynamicPeer: can’t swap \(identifier) out")
+                return false
+            }
+        }
+        guard let promise = forgetDynamicPeer(identifier: identifier) else {
+            return false
+        }
+        promise.then { session in
+            RLog("iTermWorkgroupInstance.removeDynamicPeer: terminating \(identifier) guid=\(session.guid)")
+            session.terminate()
+        }
+        return true
+    }
+
+    private func forgetDynamicPeer(identifier: String) -> iTermPromise<PTYSession>? {
+        guard let promise = peerPort.removeAddedPeer(identifier: identifier) else {
+            return nil
+        }
+        dynamicPeerConfigIDs.removeAll { $0 == identifier }
+        workgroup.sessions.removeAll { $0.uniqueIdentifier == identifier }
+        promise.maybeValue?.workgroupInstance = nil
+        return promise
+    }
+
+    // A dynamic peer that ended on its own (closed, or its program asked to
+    // end) leaves the rest of the workgroup running. One shown in its pane
+    // is ending with its tab, so that falls through to the normal teardown.
+    private func removeEndedDynamicPeer(_ session: PTYSession) -> Bool {
+        guard let identifier = peerPort.identifier(for: session),
+              dynamicPeerConfigIDs.contains(identifier),
+              peerPort.activeSessionIdentifier != identifier,
+              forgetDynamicPeer(identifier: identifier) != nil else {
+            return false
+        }
+        RLog("iTermWorkgroupInstance: dynamic peer \(identifier) guid=\(session.guid) ended; keeping the workgroup")
+        return true
     }
 
     private func exitBecauseMemberTerminated(_ session: PTYSession) {

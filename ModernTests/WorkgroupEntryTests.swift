@@ -2036,3 +2036,78 @@ final class WorkgroupEntryTests: WorkgroupEntryTestBase {
     }
 }
 
+
+// MARK: - Peers added at runtime
+
+extension WorkgroupEntryTests {
+    private func switcherSegmentCount(on session: PTYSession) -> Int? {
+        guard let switcher = instance?.toolbarItems(for: session)
+                .compactMap({ $0 as? WorkgroupModeSwitcherItem }).first else {
+            return nil
+        }
+        return switcher.segmentCount
+    }
+
+    private func addDynamicPeer(named name: String) -> (config: iTermWorkgroupSessionConfig, session: PTYSession) {
+        let config = iTermWorkgroupInstance.dynamicPeerConfig(name: name,
+                                                              command: "",
+                                                              rootID: workgroup.root!.uniqueIdentifier)
+        let promise = spawner.spawnPeer(parent: leader, config: config)
+        instance!.adoptDynamicPeer(config: config, promise: promise)
+        return (config, promise.maybeValue!)
+    }
+
+    func test_dynamicPeer_addsSwitcherSegment() {
+        let wg = WGFix.wgRootWithPeers(n: 1, rootItems: [.modeSwitcher], peerItems: [.modeSwitcher])
+        enterWorkgroup(wg)
+        XCTAssertEqual(switcherSegmentCount(on: leader), 2)
+
+        let added = addDynamicPeer(named: "worker")
+
+        XCTAssertEqual(instance!.peerPort.peerCount, 3)
+        XCTAssertEqual(switcherSegmentCount(on: leader), 3)
+        XCTAssertEqual(switcherSegmentCount(on: added.session), 3)
+        XCTAssertEqual(instance!.peerPort.label(forPeerID: added.config.uniqueIdentifier), "worker")
+        XCTAssertTrue(added.session.workgroupInstance === instance)
+    }
+
+    func test_dynamicPeer_endingItKeepsTheWorkgroup() {
+        let wg = WGFix.wgRootWithPeers(n: 1, rootItems: [.modeSwitcher], peerItems: [.modeSwitcher])
+        enterWorkgroup(wg)
+        let added = addDynamicPeer(named: "worker")
+
+        NotificationCenter.default.post(name: NSNotification.Name.iTermSessionWillTerminate,
+                                        object: added.session)
+
+        XCTAssertFalse(instance!.didTeardown)
+        XCTAssertEqual(instance!.peerPort.peerCount, 2)
+        XCTAssertEqual(switcherSegmentCount(on: leader), 2)
+        XCTAssertTrue(instance!.dynamicPeerConfigIDs.isEmpty)
+        XCTAssertNil(instance!.workgroup.session(withUniqueIdentifier: added.config.uniqueIdentifier))
+    }
+
+    func test_dynamicPeer_removeTerminatesOnlyThatPeer() {
+        spawner.sessionFactory = { SpyPTYSession(synthetic: false)! }
+        let wg = WGFix.wgRootWithPeers(n: 1)
+        enterWorkgroup(wg)
+        let added = addDynamicPeer(named: "worker")
+        let configuredPeer = spawner.session(forConfigID: wg.sessions[1].uniqueIdentifier) as! SpyPTYSession
+
+        XCTAssertTrue(instance!.removeDynamicPeer(identifier: added.config.uniqueIdentifier))
+
+        XCTAssertEqual((added.session as! SpyPTYSession).spy_terminateCount, 1)
+        XCTAssertEqual(configuredPeer.spy_terminateCount, 0)
+        XCTAssertFalse(instance!.didTeardown)
+        XCTAssertFalse(instance!.removeDynamicPeer(identifier: wg.sessions[1].uniqueIdentifier),
+                       "A configured peer isn’t removable")
+    }
+
+    func test_dynamicPeer_configsRoundTripThroughTheDescriptor() {
+        let config = iTermWorkgroupInstance.dynamicPeerConfig(name: "worker", command: "copilot", rootID: "root")
+        let json = iTermWorkgroupRestoration.encodeDynamicPeers([config])
+        let decoded = iTermWorkgroupRestoration.decodeDynamicPeers(
+            from: [iTermWorkgroupRestoration.Key.dynamicPeers: json as Any])
+        XCTAssertEqual(decoded, [config])
+        XCTAssertNil(iTermWorkgroupRestoration.encodeDynamicPeers([]))
+    }
+}

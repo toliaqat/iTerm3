@@ -128,6 +128,34 @@ class PTYSessionPeerPort: NSObject {
         session.set(peerPort: self)
     }
 
+    /// Adds a member to a running peer group (a workgroup peer opened on request, see
+    /// iTermWorkgroupInstance.addDynamicPeer).
+    func addPeer(identifier: String, promise: iTermPromise<PTYSession>) {
+        guard !invalidated, peers[identifier] == nil else {
+            return
+        }
+        peers[identifier] = promise
+        promise.then { [weak self] peerSession in
+            guard let self, !self.invalidated, self.peers[identifier] === promise else { return }
+            peerSession.set(peerPort: self)
+        }
+    }
+
+    /// Removes a member other than the leader and the active one, and returns its promise. The
+    /// caller ends the session.
+    func removePeer(identifier: String) -> iTermPromise<PTYSession>? {
+        guard identifier != leader,
+              identifier != activeSessionIdentifier,
+              identifier != lastSwappedActiveIdentifier,
+              let promise = peers.removeValue(forKey: identifier) else {
+            return nil
+        }
+        if let session = promise.maybeValue, session.peerPort === self {
+            session.peerPort = nil
+        }
+        return promise
+    }
+
     func contains(session: PTYSession) -> Bool {
         return Array(peers.values).anySatisfies { $0.maybeValue === session }
     }

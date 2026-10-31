@@ -30,9 +30,12 @@ final class iTermWorkgroupPeerPort: PTYSessionPeerPort {
     // (two spacers, two separators — both get distinct NSViews).
     private var itemsByPeerID: [String: [SessionToolbarGenericView]] = [:]
 
-    private let peerMembers: [(identifier: String,
+    private var peerMembers: [(identifier: String,
                                label: String,
                                shortcut: WorkgroupToolbarShortcut?)]
+
+    // Kept to build the toolbar of a member added after init.
+    private let gitPoller: iTermGitPoller?
 
     // Held so handleButtonTap / diffDidSelect can find the config for
     // the peer whose UI fired the event (for `command` and
@@ -89,11 +92,8 @@ final class iTermWorkgroupPeerPort: PTYSessionPeerPort {
          gitPoller: iTermGitPoller?,
          codeReviewSessionCount: Int = 0) {
         self.codeReviewSessionCount = codeReviewSessionCount
-        self.peerMembers = peerConfigs.map { cfg in
-            (identifier: cfg.uniqueIdentifier,
-             label: cfg.displayName.isEmpty ? "Peer" : cfg.displayName,
-             shortcut: cfg.peerSwitchShortcut)
-        }
+        self.peerMembers = Self.members(of: peerConfigs)
+        self.gitPoller = gitPoller
         self.leaderScope = leaderScope
 
         super.init(peers: peers,
@@ -115,35 +115,9 @@ final class iTermWorkgroupPeerPort: PTYSessionPeerPort {
         // `displayName` (used by the auto-injected .name item) varies
         // by peer.
         for cfg in peerConfigs {
-            let context = WorkgroupToolbarContext(
-                peerPort: self,
-                gitPoller: gitPoller,
-                scope: leaderScope,
-                peerGroupMembers: peerMembers,
-                activePeerIdentifier: activeSessionIdentifier,
-                navigationDelegate: self,
-                diffSelectorDelegate: self,
-                gitBaseSelectorDelegate: self,
-                displayName: cfg.displayName,
-                autoSendClippingsDelegate: self,
-                autoSendClippingsInitiallyOn:
-                    peers[cfg.uniqueIdentifier]?.maybeValue?.autoSendClippingsWhenIdle ?? false,
-                autoRequestReviewDelegate: self,
-                autoRequestReviewInitiallyOn:
-                    peers[cfg.uniqueIdentifier]?.maybeValue?.autoRequestReviewWhenIdle ?? false,
-                autoRequestReviewEnabled: codeReviewSessionCount == 1)
-            var views: [SessionToolbarGenericView] = []
-            let augmented = WorkgroupToolbarBuilder
-                .injectAutoItems(into: cfg.toolbarItems)
-            for item in augmented {
-                if let view = WorkgroupToolbarBuilder.build(
-                    item: item,
-                    context: context,
-                    ownerPeerID: cfg.uniqueIdentifier) {
-                    views.append(view)
-                }
-            }
-            itemsByPeerID[cfg.uniqueIdentifier] = views
+            itemsByPeerID[cfg.uniqueIdentifier] = makeToolbarViews(
+                for: cfg,
+                session: peers[cfg.uniqueIdentifier]?.maybeValue)
         }
         self.peerConfigs = peerConfigs
 
@@ -168,6 +142,109 @@ final class iTermWorkgroupPeerPort: PTYSessionPeerPort {
         // already builds NSViews above, so it necessarily runs on main.
         MainActor.assumeIsolated {
             seedBusyStates()
+        }
+    }
+
+    private static func members(of configs: [iTermWorkgroupSessionConfig]) -> [(identifier: String,
+                                                                               label: String,
+                                                                               shortcut: WorkgroupToolbarShortcut?)] {
+        return configs.map { cfg in
+            (identifier: cfg.uniqueIdentifier,
+             label: cfg.displayName.isEmpty ? "Peer" : cfg.displayName,
+             shortcut: cfg.peerSwitchShortcut)
+        }
+    }
+
+    private func makeContext(for cfg: iTermWorkgroupSessionConfig,
+                             session: PTYSession?) -> WorkgroupToolbarContext {
+        return WorkgroupToolbarContext(
+            peerPort: self,
+            gitPoller: gitPoller,
+            scope: leaderScope,
+            peerGroupMembers: peerMembers,
+            activePeerIdentifier: activeSessionIdentifier,
+            navigationDelegate: self,
+            diffSelectorDelegate: self,
+            gitBaseSelectorDelegate: self,
+            displayName: cfg.displayName,
+            autoSendClippingsDelegate: self,
+            autoSendClippingsInitiallyOn: session?.autoSendClippingsWhenIdle ?? false,
+            autoRequestReviewDelegate: self,
+            autoRequestReviewInitiallyOn: session?.autoRequestReviewWhenIdle ?? false,
+            autoRequestReviewEnabled: codeReviewSessionCount == 1)
+    }
+
+    // Build each peer's ordered list of views fresh. No cross-peer
+    // sharing — a second `.spacer(4,4)` in the same list gets its
+    // own NSView, and two peers with `.modeSwitcher` get separate
+    // instances too. Each item is tagged with its owner peer ID so
+    // delegate callbacks (button taps, file picks) know which
+    // peer fired them. The context is per peer because `displayName`
+    // (used by the auto-injected .name item) varies by peer.
+    private func makeToolbarViews(for cfg: iTermWorkgroupSessionConfig,
+                                  session: PTYSession?) -> [SessionToolbarGenericView] {
+        let context = makeContext(for: cfg, session: session)
+        return WorkgroupToolbarBuilder.injectAutoItems(into: cfg.toolbarItems).compactMap { item in
+            WorkgroupToolbarBuilder.build(item: item,
+                                          context: context,
+                                          ownerPeerID: cfg.uniqueIdentifier)
+        }
+    }
+
+    // MARK: - Members added at runtime
+
+    // Adds a member after the group was built, as a new segment of every
+    // peer's mode switcher.
+    func addPeer(config: iTermWorkgroupSessionConfig,
+                 promise: iTermPromise<PTYSession>) {
+        guard !invalidated, !peerConfigs.contains(where: { $0.uniqueIdentifier == config.uniqueIdentifier }) else {
+            return
+        }
+        addPeer(identifier: config.uniqueIdentifier, promise: promise)
+        peerConfigs.append(config)
+        peerMembers = Self.members(of: peerConfigs)
+        itemsByPeerID[config.uniqueIdentifier] = makeToolbarViews(for: config, session: nil)
+        rebuildModeSwitchers()
+    }
+
+    // Removes a member added by addPeer(config:promise:). Returns its promise, or nil when it
+    // is the leader or the active member.
+    func removeAddedPeer(identifier: String) -> iTermPromise<PTYSession>? {
+        guard let promise = removePeer(identifier: identifier) else {
+            return nil
+        }
+        peerConfigs.removeAll { $0.uniqueIdentifier == identifier }
+        peerMembers = Self.members(of: peerConfigs)
+        itemsByPeerID.removeValue(forKey: identifier)
+        lastPeerState.removeValue(forKey: identifier)
+        rebuildModeSwitchers()
+        return promise
+    }
+
+    // A switcher's segments are fixed when it's built, so a change of
+    // members replaces every peer's switcher and redisplays the toolbar.
+    private func rebuildModeSwitchers() {
+        for cfg in peerConfigs {
+            guard let views = itemsByPeerID[cfg.uniqueIdentifier],
+                  views.contains(where: { $0 is WorkgroupModeSwitcherItem }) else {
+                continue
+            }
+            let context = makeContext(for: cfg, session: session(forIdentifier: cfg.uniqueIdentifier))
+            itemsByPeerID[cfg.uniqueIdentifier] = views.map { view in
+                guard view is WorkgroupModeSwitcherItem,
+                      let replacement = WorkgroupToolbarBuilder.build(item: .modeSwitcher,
+                                                                      context: context,
+                                                                      ownerPeerID: cfg.uniqueIdentifier) else {
+                    return view
+                }
+                return replacement
+            }
+        }
+        MainActor.assumeIsolated {
+            seedBusyStates()
+        }
+        if let active = activeSession {
+            active.delegate?.sessionDidChangeDesiredToolbarItems(active)
         }
     }
 

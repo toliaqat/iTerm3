@@ -3,9 +3,10 @@
 # workspace. Installed by iTerm2 > Install Copilot CLI Integration with the iterm2-workspace skill.
 #
 # The workspace is the orchestrator's window, narrowed to its project: the project tab group its
-# tab is in, or else its git repository (or folder). Tabs that ws opens are workers. Their shell
-# exports ITERM2_ORCHESTRATOR_ID and their session has user.agentRole=worker, and ws refuses to run
-# in either case, so a worker can't open tabs of its own.
+# tab is in, or else its git repository (or folder). Sessions that ws opens are workers: tabs, or,
+# when the orchestrator is in a workgroup, peers in the workgroup's switcher. Their shell exports
+# ITERM2_ORCHESTRATOR_ID and their session has user.agentRole=worker, and ws refuses to run in
+# either case, so a worker can't open sessions of its own.
 
 set -u
 
@@ -35,14 +36,16 @@ Usage: ws <command> [arguments]
 
   info                         Show this session, its workspace, and its role.
   list                         List the other sessions in the workspace with their status.
-  spawn [options]              Open a worker tab and print its session ID.
-      --name NAME              Tab name.
+  spawn [options]              Open a worker and print its session ID. In a workgroup the
+                               worker is a new segment of its switcher; otherwise a tab.
+      --name NAME              Worker name.
       --dir DIR                Working folder (default: the workspace root).
       --agent copilot|claude|shell
                                What to run (default: copilot).
       --prompt TEXT            First prompt for the agent (for shell: a command).
       --flags FLAGS            Extra agent flags (default for copilot: --yolo).
-      --focus                  Leave the new tab selected.
+      --focus                  Show the new worker.
+      --tab                    Open a tab even in a workgroup.
   send ID TEXT                 Type TEXT into a session and press Return.
   keys ID TEXT                 Type TEXT without pressing Return (use $'\e' for Esc).
   read ID [LINES]              Print the last LINES lines of a session’s screen (default 40).
@@ -51,7 +54,7 @@ Usage: ws <command> [arguments]
                                Wait until one of the sessions is done, waiting, failed,
                                idle after working, or quiet (not working and its screen
                                unchanged for 20 s), and print its ID and status.
-  focus ID                     Select a session’s tab.
+  focus ID                     Show a session.
   close ID                     Close a worker this session opened.
   release ID                   Stop treating a worker this session opened as a worker.
 EOF
@@ -126,14 +129,59 @@ workspace_rows() {
         $4 == "" && ($5 == root || index($5, root "/") == 1) { print }'
 }
 
+# IDs of the workgroup peers this session opened. Peers aren't in tabs, so they aren't in
+# `it2 session list`; the orchestrator keeps their IDs in user.workerPeers.
+peer_ids() {
+    local value
+    value="$(it2 session get-var user.workerPeers --session "$ME_ID" 2>/dev/null)" || return 0
+    case "$value" in
+        \"*) value="${value#\"}"; value="${value%\"}" ;;
+        *) return 0 ;;
+    esac
+    local id
+    for id in $value; do
+        printf '%s\n' "$id"
+    done
+}
+
+set_peer_ids() {
+    local ids
+    ids="$(printf '%s ' "$@")"
+    ids="${ids% }"
+    it2 session set-var user.workerPeers "\"$ids\"" --session "$ME_ID" >/dev/null
+}
+
+is_peer() {
+    [ -n "$1" ] && peer_ids | grep -qxF -- "$1"
+}
+
+forget_peer() {
+    local id rest=()
+    for id in $(peer_ids); do
+        [ "$id" = "$1" ] || rest+=("$id")
+    done
+    set_peer_ids "${rest[@]+"${rest[@]}"}"
+}
+
+# A string variable of a session, without get-var's JSON quotes.
+var_of() {
+    local value
+    value="$(it2 session get-var "$1" --session "$2" 2>/dev/null)" || return 0
+    case "$value" in
+        \"*\") value="${value#\"}"; printf '%s' "${value%\"}" ;;
+    esac
+}
+
 require_member() {
     local id="$1"
     [ -n "$id" ] || die "missing session ID."
+    is_peer "$id" && return 0
     workspace_rows | awk -F"$SEP" -v id="$id" '$1 == id { found = 1 } END { exit !found }' ||
         die "session $id isn’t in this workspace."
 }
 
 require_own_worker() {
+    is_peer "$1" && return 0
     workspace_rows | awk -F"$SEP" -v id="$1" -v me="$ME_ID" '$1 == id && $6 == "worker" && $7 == me { found = 1 } END { exit !found }' ||
         die "session $1 isn’t a worker this session opened. Ask the user before touching it."
 }
@@ -160,11 +208,23 @@ cmd_list() {
     workspace_rows | while IFS="$SEP" read -r id _ _ _ path role _ name job; do
         printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "${role:-user}" "$(status_of "$id")" "$name" "$job" "$path"
     done
+    local id status live=()
+    for id in $(peer_ids); do
+        # A peer that ended is gone from the workgroup.
+        status_json "$id" >/dev/null || continue
+        live+=("$id")
+        status="$(status_of "$id")"
+        printf '%s\tworker (peer)\t%s\t%s\t%s\t%s\n' "$id" "$status" "$(var_of session.name "$id")" \
+            "$(var_of session.jobName "$id")" "$(var_of session.path "$id")"
+    done
+    if [ "${#live[@]}" != "$(peer_ids | wc -l | tr -d ' ')" ]; then
+        set_peer_ids "${live[@]+"${live[@]}"}"
+    fi
 }
 
 cmd_spawn() {
     require_orchestrator
-    local name="" dir="$ROOT" agent="copilot" prompt="" flags="" flags_set=0 focus=0
+    local name="" dir="$ROOT" agent="copilot" prompt="" flags="" flags_set=0 focus=0 tab=0
     while [ $# -gt 0 ]; do
         case "$1" in
             --name) name="$2"; shift 2 ;;
@@ -173,6 +233,7 @@ cmd_spawn() {
             --prompt) prompt="$2"; shift 2 ;;
             --flags) flags="$2"; flags_set=1; shift 2 ;;
             --focus) focus=1; shift ;;
+            --tab) tab=1; shift ;;
             *) die "unknown spawn option $1" ;;
         esac
     done
@@ -202,7 +263,25 @@ cmd_spawn() {
     local command="cd -- $(quote "$dir") && export ITERM2_ORCHESTRATOR_ID=$(quote "$ME_ID")"
     [ -n "$run" ] && command="$command && $run"
 
-    local selected created id
+    local selected created id err
+    # In a workgroup, the worker is a peer: a segment of the workgroup's switcher.
+    if [ $tab = 0 ]; then
+        local activate=()
+        [ $focus = 1 ] && activate=(--activate)
+        if id="$(it2 session add-peer "${name:-$agent}" --command "$command" --session "$ME_ID" ${activate[@]+"${activate[@]}"} 2>&1)"; then
+            it2 session set-var user.agentRole worker --session "$id" >/dev/null
+            it2 session set-var user.orchestratorID "$ME_ID" --session "$id" >/dev/null
+            [ -n "$name" ] && it2 session set-name "$name" --session "$id" >/dev/null
+            set_peer_ids $(peer_ids) "$id"
+            printf '%s\n' "$id"
+            return 0
+        fi
+        err="$id"
+        case "$err" in
+            *"isn’t in a workgroup"*) ;;
+            *) echo "ws: couldn’t add a workgroup peer (${err#*: }); opening a tab instead." >&2 ;;
+        esac
+    fi
     selected="$(it2 tab list --window "$ME_WINDOW" --json 2>/dev/null | tr -d '\n' |
         sed 's/}/}\n/g' | grep '"is_active" *: *true' | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p' | head -1)"
     created="$(it2 tab new --window "$ME_WINDOW" --json --command "$command")" || die "couldn’t open a tab."
@@ -310,6 +389,11 @@ cmd_close() {
     require_orchestrator
     require_member "${1:-}"
     require_own_worker "$1"
+    if is_peer "$1"; then
+        it2 session remove-peer "$1" --session "$ME_ID" >/dev/null || die "couldn’t close $1."
+        forget_peer "$1"
+        return 0
+    fi
     it2 session close --session "$1" --force
 }
 
@@ -319,6 +403,8 @@ cmd_release() {
     require_own_worker "$1"
     it2 session set-var user.agentRole '""' --session "$1" >/dev/null
     it2 session set-var user.orchestratorID '""' --session "$1" >/dev/null
+    is_peer "$1" && forget_peer "$1"
+    return 0
 }
 
 command="${1:-}"

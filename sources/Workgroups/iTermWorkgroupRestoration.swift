@@ -54,6 +54,27 @@ final class iTermWorkgroupRestoration: NSObject {
         // whose programs run on its leader's host. Without it a restored peer's reload would
         // run its command on this Mac.
         static let remoteHosts = "remoteHosts"
+        // JSON of the configs of peers added while the workgroup ran (see
+        // iTermWorkgroupInstance.addDynamicPeer). They aren't in the saved
+        // workgroup, so restore needs them to rebuild those members.
+        static let dynamicPeers = "dynamicPeers"
+    }
+
+    static func encodeDynamicPeers(_ configs: [iTermWorkgroupSessionConfig]) -> String? {
+        guard !configs.isEmpty,
+              let data = try? JSONEncoder().encode(configs) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func decodeDynamicPeers(from descriptor: [AnyHashable: Any]) -> [iTermWorkgroupSessionConfig] {
+        guard let json = descriptor[Key.dynamicPeers] as? String,
+              let data = json.data(using: .utf8),
+              let configs = try? JSONDecoder().decode([iTermWorkgroupSessionConfig].self, from: data) else {
+            return []
+        }
+        return configs
     }
 
     /// Gives restored members back the remote host they ran on, and gives `spawner` (the
@@ -163,6 +184,9 @@ final class iTermWorkgroupRestoration: NSObject {
             }
             if !nonPeers.isEmpty {
                 result[Key.nonPeerChildren] = nonPeers
+            }
+            if let dynamicPeers = encodeDynamicPeers(instance.dynamicPeerConfigs) {
+                result[Key.dynamicPeers] = dynamicPeers
             }
         }
 

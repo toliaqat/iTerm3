@@ -1174,6 +1174,7 @@
 		9A0CA7F82D9DB1934FC5BB8C /* ChatMentionPickerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D87E8EB4F6B647368CED6F0 /* ChatMentionPickerController.swift */; };
 		9C00B7F08A146564D3E23EB2 /* CompanionAgentActivityNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A2A4F72E8C0C105D051F037 /* CompanionAgentActivityNotifier.swift */; };
 		9C08F768EA4EA1E37B6A7085 /* AddClippingBuiltInFunction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10C843E3FEB7FC74ADE7DC0 /* AddClippingBuiltInFunction.swift */; };
+		84E783CD48EC41C48F90B4A7 /* WorkgroupPeerBuiltInFunctions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2524D5494D3E436FA44A701D /* WorkgroupPeerBuiltInFunctions.swift */; };
 		9C7078E2AF6B527E9E15B01E /* iTermCursorBlinkFadePreset.h in Sources */ = {isa = PBXBuildFile; fileRef = 530EEE3BD040B9AF8FBD0955 /* iTermCursorBlinkFadePreset.h */; };
 		9C7663E851E9AD62565598E5 /* iTermRightGutterPanel.h in Sources */ = {isa = PBXBuildFile; fileRef = B15DB929A47296D3B8F7CBF9 /* iTermRightGutterPanel.h */; };
 		9C84C4320A70104EEB9C0D65 /* WindowLocationLockController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE7A6B656E953B6C1CAA73F /* WindowLocationLockController.swift */; };
@@ -8890,6 +8891,7 @@
 		C08AA4008946722C3F4C67C1 /* WordSelectionAtom.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WordSelectionAtom.swift; sourceTree = "<group>"; };
 		C0A28E717306FFCBB02A7DB2 /* CompanionFrameChannel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompanionFrameChannel.swift; sourceTree = "<group>"; };
 		C10C843E3FEB7FC74ADE7DC0 /* AddClippingBuiltInFunction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AddClippingBuiltInFunction.swift; sourceTree = "<group>"; };
+		2524D5494D3E436FA44A701D /* WorkgroupPeerBuiltInFunctions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkgroupPeerBuiltInFunctions.swift; sourceTree = "<group>"; };
 		C253AF0160FA01071B7DD22F /* CompanionPushSender.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompanionPushSender.swift; sourceTree = "<group>"; };
 		C25F46F9F3BA829BDB185B38 /* iTermHDREngager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = iTermHDREngager.swift; sourceTree = "<group>"; };
 		C2B75EA7ECA05D0BBE98C9EF /* CompanionPixelBufferHash.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompanionPixelBufferHash.swift; sourceTree = "<group>"; };
@@ -13425,6 +13427,7 @@
 				A6BAB25B2F8CBC550063FA7F /* SetStatusBuiltInFunction.swift */,
 				A6C5EDCE2D4D6CF3000D9E85 /* TmuxFormatBuiltInCommand.swift */,
 				C10C843E3FEB7FC74ADE7DC0 /* AddClippingBuiltInFunction.swift */,
+				2524D5494D3E436FA44A701D /* WorkgroupPeerBuiltInFunctions.swift */,
 				9801DA0646B0541548CD6B0E /* ApplyLayoutBuiltInFunction.swift */,
 				9B084D285B6C1CDDE2932596 /* ArchiveClippingsBuiltInFunction.swift */,
 				CB585CA61BDA34E5071CFD83 /* ColorAlphaBuiltInFunction.swift */,
@@ -20106,6 +20109,7 @@
 				43CCE7B54FAC55824859ABD6 /* AddClippingPanel.swift in Sources */,
 				84ADC3D7A7ED48A3AB5F1210 /* ClippingsGutterPanel.swift in Sources */,
 				9C08F768EA4EA1E37B6A7085 /* AddClippingBuiltInFunction.swift in Sources */,
+				84E783CD48EC41C48F90B4A7 /* WorkgroupPeerBuiltInFunctions.swift in Sources */,
 				F96B31FFBFC5DFE713E9C670 /* EnterWorkgroupBrowserTrigger.swift in Sources */,
 				EFA4A1D0B4853EF8B42D4CA3 /* ExitWorkgroupBrowserTrigger.swift in Sources */,
 				E4BF4BC18C3054F2AD6145DC /* iTermWorkgroupSessionMode.swift in Sources */,
