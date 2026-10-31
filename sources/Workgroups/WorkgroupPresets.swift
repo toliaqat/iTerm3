@@ -70,6 +70,23 @@ enum WorkgroupPresets {
             sessions: [root, diff])
     }
 
+    // The review peer's command. The values in it are bound at launch in
+    // PTYSession.wrappedCommandForCodeReview: `codeReviewPrompt` is the
+    // shell-quoted prompt, `codeReviewSystemPromptFile` a file holding the
+    // user-editable system prompt (Settings > General > AI > Prompts),
+    // defaulting to the bundled code-review-system-prompt.txt, and
+    // `codeReviewSettingsFile` the bundled code-review-settings.txt, or for
+    // a peer on a remote host, a copy written there.
+    static let claudeCodeReviewCommand =
+        "claude \\(codeReviewPrompt) --append-system-prompt-file '\\(codeReviewSystemPromptFile)' --settings '\\(codeReviewSettingsFile)'"
+
+    // Copilot CLI has no system prompt file option, so the system prompt
+    // leads the first prompt. It may read and run commands (git, and it2 to
+    // add clippings) but not edit files. ITERM2_CODE_REVIEW keeps it from
+    // using the iterm2-workspace skill to orchestrate other sessions.
+    static let copilotCodeReviewCommand =
+        "env ITERM2_CODE_REVIEW=1 copilot --allow-all-tools --deny-tool=write -i \"$(cat '\\(codeReviewSystemPromptFile)'; echo; printf '%s' \\(codeReviewPrompt))\""
+
     // Builds a Chat-root + Diff-peer + Code-Review-peer workgroup. Shared
     // between the user-pickable preset (defaults: fresh UUIDs and a
     // user-friendly name) and the Claude Code onboarding installer, which
@@ -80,7 +97,8 @@ enum WorkgroupPresets {
         rootID: String = UUID().uuidString,
         diffID: String = UUID().uuidString,
         reviewID: String = UUID().uuidString,
-        name: String = String(localized: "WorkgroupPresets.CodingAgentPlusDiffPlusCodeReview", defaultValue: "Coding Agent + Diff + Code Review", comment: "Preset name: coding agent plus diff plus code review")
+        name: String = String(localized: "WorkgroupPresets.CodingAgentPlusDiffPlusCodeReview", defaultValue: "Coding Agent + Diff + Code Review", comment: "Preset name: coding agent plus diff plus code review"),
+        reviewCommand: String = claudeCodeReviewCommand
     ) -> iTermWorkgroup {
         let main = iTermWorkgroupSessionConfig(
             uniqueIdentifier: rootID,
@@ -112,14 +130,7 @@ enum WorkgroupPresets {
             parentID: rootID,
             kind: .peer,
             profileGUID: nil,
-            // `codeReviewSystemPromptFile` is bound at launch in
-            // PTYSession.wrappedCommandForCodeReview to a temp file
-            // holding the user-editable system prompt (Settings >
-            // General > AI > Prompts), defaulting to the bundled
-            // code-review-system-prompt.txt. `codeReviewSettingsFile` is
-            // the bundled code-review-settings.txt, or for a peer on a
-            // remote host, a copy written there.
-            command: "claude \\(codeReviewPrompt) --append-system-prompt-file '\\(codeReviewSystemPromptFile)' --settings '\\(codeReviewSettingsFile)'",
+            command: reviewCommand,
             urlString: "",
             toolbarItems: [.modeSwitcher,
                            .reload(WorkgroupToolbarShortcut.reloadDefault),

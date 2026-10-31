@@ -98,8 +98,16 @@ is_worker() {
     [ -n "${ITERM2_ORCHESTRATOR_ID:-}" ] || [ "$ME_ROLE" = "worker" ]
 }
 
+# The Code Review peer of a Copilot CLI workgroup runs with ITERM2_CODE_REVIEW set.
+is_reviewer() {
+    [ -n "${ITERM2_CODE_REVIEW:-}" ]
+}
+
 require_orchestrator() {
     load_me
+    if is_reviewer; then
+        die "this session is a workgroup’s code reviewer. Reviewers don’t open or control other sessions; add clippings for Chat instead."
+    fi
     if is_worker; then
         die "this session is a worker of orchestrator ${ITERM2_ORCHESTRATOR_ID:-$ME_PARENT}. Workers don’t open or control other sessions; report back to the orchestrator instead."
     fi
@@ -142,6 +150,7 @@ cmd_info() {
     load_me
     local role="orchestrator"
     is_worker && role="worker of ${ITERM2_ORCHESTRATOR_ID:-$ME_PARENT}"
+    is_reviewer && role="code reviewer"
     printf 'session\t%s\nwindow\t%s\nworkspace\t%s (%s)\nrole\t%s\n' "$ME_ID" "$ME_WINDOW" "$ROOT" "$ROOT_KIND" "$role"
 }
 

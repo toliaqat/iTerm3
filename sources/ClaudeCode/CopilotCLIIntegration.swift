@@ -13,6 +13,9 @@ import AppKit
 @objc(iTermCopilotCLIIntegration)
 final class CopilotCLIIntegration: NSObject {
     static let agentArguments = "--agent copilot"
+    // Copilot CLI denies the tool when a PreToolUse hook fails, so a hook that can't run (an
+    // older it2, or iTerm2's API unreachable) must still succeed.
+    static let failOpen = " 2>/dev/null || true"
     static let skillName = "iterm2-workspace"
 
     // PermissionRequest is left out: Copilot CLI sends it without hook_event_name, before the
@@ -55,11 +58,76 @@ final class CopilotCLIIntegration: NSObject {
     }
 
     @objc static var isInstalled: Bool {
-        return hooksInstalled() && skillInstalled()
+        return hooksInstalled() && skillInstalled() && workgroupInstalled
     }
 
     static var isPartlyInstalled: Bool {
-        return hooksInstalled() || skillInstalled()
+        return hooksInstalled() || skillInstalled() ||
+            iTermWorkgroupModel.instance.workgroup(uniqueIdentifier: workgroupID) != nil
+    }
+
+    private static let workgroupID = CopilotCLIWorkgroupTemplate.ID.workgroup
+    private static let jobName = CopilotCLIWorkgroupTemplate.jobName
+
+    // The workgroup exists and every profile that can hold triggers enters it
+    // when copilot starts.
+    static var workgroupInstalled: Bool {
+        guard iTermWorkgroupModel.instance.workgroup(uniqueIdentifier: workgroupID) != nil,
+              let model = ProfileModel.sharedInstance() else {
+            return false
+        }
+        return model.bookmarks().allSatisfy {
+            !ClaudeCodeOnboarding.profileIsEligibleForClaudeTriggers($0) ||
+                ClaudeCodeOnboarding.profileHasClaudeWorkgroupTriggers($0,
+                                                                       workgroupID: workgroupID,
+                                                                       jobName: jobName)
+        }
+    }
+
+    // Adds the Copilot CLI workgroup and, to every profile that can hold them
+    // (and sessions divorced from those), triggers that enter it when copilot
+    // starts and leave it when the leader's copilot ends.
+    static func installWorkgroup() {
+        if iTermWorkgroupModel.instance.workgroup(uniqueIdentifier: workgroupID) == nil {
+            iTermWorkgroupModel.instance.add(CopilotCLIWorkgroupTemplate.config)
+        }
+        guard let shared = ProfileModel.sharedInstance(),
+              let enter = ClaudeCodeOnboarding.makeEnterWorkgroupTrigger(workgroupID: workgroupID,
+                                                                        jobName: jobName),
+              let exit = ClaudeCodeOnboarding.makeExitWorkgroupTrigger(jobName: jobName) else {
+            return
+        }
+        var guids = Set<String>()
+        for profile in shared.bookmarks() where ClaudeCodeOnboarding.profileIsEligibleForClaudeTriggers(profile) {
+            guard let guid = profile[KEY_GUID] as? String else { continue }
+            guids.insert(guid)
+            ClaudeCodeOnboarding.addClaudeWorkgroupTriggers([enter, exit], toProfileWithGUID: guid, in: shared,
+                                                           workgroupID: workgroupID, jobName: jobName)
+        }
+        shared.flush()
+        if let sessions = ProfileModel.sessionsInstance() {
+            for profile in sessions.bookmarks() {
+                guard let original = profile[KEY_ORIGINAL_GUID] as? String, guids.contains(original),
+                      let guid = profile[KEY_GUID] as? String else {
+                    continue
+                }
+                ClaudeCodeOnboarding.addClaudeWorkgroupTriggers([enter, exit], toProfileWithGUID: guid, in: sessions,
+                                                               workgroupID: workgroupID, jobName: jobName)
+            }
+        }
+        // Makes running sessions reload their profiles and pick up the triggers.
+        NotificationCenter.default.post(name: NSNotification.Name(kReloadAllProfiles), object: nil)
+    }
+
+    static func uninstallWorkgroup() {
+        for model in [ProfileModel.sharedInstance(), ProfileModel.sessionsInstance()].compactMap({ $0 }) {
+            ClaudeCodeOnboarding.removeOurWorkgroupTriggers(from: model, workgroupID: workgroupID, jobName: jobName)
+        }
+        ProfileModel.sharedInstance()?.flush()
+        if iTermWorkgroupModel.instance.workgroup(uniqueIdentifier: workgroupID) != nil {
+            iTermWorkgroupModel.instance.remove(uniqueIdentifier: workgroupID)
+        }
+        NotificationCenter.default.post(name: NSNotification.Name(kReloadAllProfiles), object: nil)
     }
 
     static func hooksFileContents(command: String) throws -> Data {
@@ -98,9 +166,10 @@ final class CopilotCLIIntegration: NSObject {
         let url = hooksFileURL()
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
-        try hooksFileContents(command: base + " " + agentArguments).write(to: url, options: .atomic)
+        try hooksFileContents(command: base + " " + agentArguments + failOpen).write(to: url, options: .atomic)
         try installSkill(it2Path: (dotDir as NSString).appendingPathComponent("it2"))
-        RLog("Installed Copilot CLI hooks at \(url.path) and the \(skillName) skill")
+        installWorkgroup()
+        RLog("Installed Copilot CLI hooks at \(url.path), the \(skillName) skill, and the workgroup")
     }
 
     /// Removes only what install wrote: the hook file and the skill, each if it is ours.
@@ -111,6 +180,7 @@ final class CopilotCLIIntegration: NSObject {
         if skillInstalled(home: home) {
             try FileManager.default.removeItem(at: skillDirectoryURL(home: home))
         }
+        uninstallWorkgroup()
         RLog("Removed Copilot CLI integration from \(home.path)")
     }
 }
@@ -147,7 +217,7 @@ final class CopilotCLIIntegrationMenuController: NSObject {
             iTermToolbeltView.toggleShouldShowTool(kStatusToolName)
         }
         show(heading: String(localized: "CopilotCLI.InstalledTitle", defaultValue: "Copilot CLI Integration Installed", comment: "Title shown after installing the Copilot CLI integration"),
-             body: String(localized: "CopilotCLI.InstalledBody", defaultValue: "iTerm2 added its status hook to \(path). Copilot CLI sessions started from now on report when they’re working, waiting for you, done, or failed in the Session Status tool (View > Toolbelt > Show Toolbelt).\n\nIt also added the iterm2-workspace skill to \(skillPath). Ask a Copilot CLI session to split a job across other agents and it opens and directs them in tabs of its project. Sessions it opens can’t do the same.\n\nIf you turn on Copilot CLI’s sandbox, the hook and skill may not be able to reach iTerm2.", comment: "Body shown after installing the Copilot CLI integration. The first value is the absolute path to the hook file; the second is the absolute path to the skill folder. iterm2-workspace is the skill’s name and is not translated"))
+             body: String(localized: "CopilotCLI.InstalledBody", defaultValue: "iTerm2 added its status hook to \(path). Copilot CLI sessions started from now on report when they’re working, waiting for you, done, or failed in the Session Status tool (View > Toolbelt > Show Toolbelt).\n\nIt also added the iterm2-workspace skill to \(skillPath). Ask a Copilot CLI session to split a job across other agents and it opens and directs them in tabs of its project. Sessions it opens can’t do the same.\n\nWhen Copilot CLI starts, its session joins the “Copilot CLI” workgroup, with Chat, Diff, and Code Review modes. Code Review runs another Copilot CLI that can read your changes but not edit them; its comments can go back to Chat.\n\nIf you turn on Copilot CLI’s sandbox, the hook and skill may not be able to reach iTerm2.", comment: "Body shown after installing the Copilot CLI integration. The first value is the absolute path to the hook file; the second is the absolute path to the skill folder. iterm2-workspace is the skill’s name and is not translated"))
     }
 
     @objc func uninstall(_ sender: Any?) {
@@ -155,7 +225,7 @@ final class CopilotCLIIntegrationMenuController: NSObject {
         let skillPath = CopilotCLIIntegration.skillDirectoryURL().path
         let confirm = iTermWarning()
         confirm.heading = String(localized: "CopilotCLI.UninstallTitle", defaultValue: "Uninstall Copilot CLI Integration?", comment: "Title of the Copilot CLI uninstall confirmation")
-        confirm.title = String(localized: "CopilotCLI.UninstallBody", defaultValue: "This deletes \(path), which holds iTerm2’s status hook for Copilot CLI, and the iterm2-workspace skill in \(skillPath). Your other Copilot CLI hooks and skills aren’t changed.", comment: "Body of the Copilot CLI uninstall confirmation. The first value is the absolute path to the hook file; the second is the absolute path to the skill folder. iterm2-workspace is the skill’s name and is not translated")
+        confirm.title = String(localized: "CopilotCLI.UninstallBody", defaultValue: "This deletes \(path), which holds iTerm2’s status hook for Copilot CLI, and the iterm2-workspace skill in \(skillPath), and removes the “Copilot CLI” workgroup and the triggers that enter it. Your other Copilot CLI hooks and skills aren’t changed.", comment: "Body of the Copilot CLI uninstall confirmation. The first value is the absolute path to the hook file; the second is the absolute path to the skill folder. iterm2-workspace is the skill’s name and is not translated")
         confirm.actionLabels = [String(localized: "CopilotCLI.Uninstall", defaultValue: "Uninstall", comment: "Button to confirm uninstalling the Copilot CLI integration"),
                                 iTermLocalizedCancel()]
         confirm.cancelLabel = iTermLocalizedCancel()

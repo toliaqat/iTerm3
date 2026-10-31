@@ -55,4 +55,21 @@ final class ClaudeCodeTmuxProfileTriggerTests: XCTestCase {
         XCTAssertTrue(ClaudeCodeOnboarding.profileHasClaudeWorkgroupTriggers(profile("p", triggers: claudeTriggers)))
         XCTAssertFalse(ClaudeCodeOnboarding.profileHasClaudeWorkgroupTriggers(profile("p")))
     }
+
+    // The Copilot CLI workgroup's triggers read as installed only for Copilot, and Claude's only
+    // for Claude, so installing or removing one integration leaves the other's triggers alone.
+    func testCopilotTriggersAreSeparateFromClaudes() {
+        let id = CopilotCLIWorkgroupTemplate.ID.workgroup
+        let job = CopilotCLIWorkgroupTemplate.jobName
+        let copilotTriggers = [ClaudeCodeOnboarding.makeEnterWorkgroupTrigger(workgroupID: id, jobName: job),
+                               ClaudeCodeOnboarding.makeExitWorkgroupTrigger(jobName: job)].compactMap {
+            $0?.dictionaryValue() as? [String: Any]
+        }
+        XCTAssertEqual(copilotTriggers.count, 2)
+        let copilotProfile = profile("p", triggers: copilotTriggers)
+        XCTAssertTrue(ClaudeCodeOnboarding.profileHasClaudeWorkgroupTriggers(copilotProfile, workgroupID: id, jobName: job))
+        XCTAssertFalse(ClaudeCodeOnboarding.profileHasClaudeWorkgroupTriggers(copilotProfile))
+        XCTAssertFalse(ClaudeCodeOnboarding.profileHasClaudeWorkgroupTriggers(profile("p", triggers: claudeTriggers),
+                                                                            workgroupID: id, jobName: job))
+    }
 }

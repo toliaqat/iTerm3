@@ -17,11 +17,21 @@ WS="__WS_PATH__"
 Run `"$WS" info` before anything else.
 
 - `role orchestrator`: you may use this skill.
+- `role code reviewer`: you’re the Code Review session of a workgroup. Don’t use this skill;
+  review and add clippings as your instructions say.
 - `role worker of …`: you were started by another session’s orchestrator. Don’t use this skill and
   don’t open, message, or close other sessions by any other means either (no `it2`, no AppleScript).
   Do your task and report the result in your reply; the orchestrator reads your screen.
 
 The helper enforces this too: it refuses to run in a worker.
+
+## Copilot CLI workgroup
+
+With iTerm2’s Copilot CLI integration, your session is the Chat of a “Copilot CLI” workgroup. Its
+Diff and Code Review sessions belong to you, not the workspace: they don’t appear in `ws list`,
+and the user drives them from the workgroup’s toolbar. If the user turns on its automatic review,
+Code Review checks your changes when you go idle and its comments come back to you as a prompt;
+fix what they flag. Don’t spawn a reviewer of your own for that. Workers you open that run Copilot CLI get their own workgroup and review.
 
 ## The workspace
 

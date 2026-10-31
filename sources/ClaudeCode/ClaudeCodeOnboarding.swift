@@ -365,7 +365,9 @@ class ClaudeCodeOnboarding: NSObject {
         return true
     }
 
-    private static func removeOurWorkgroupTriggers(from model: ProfileModel) {
+    static func removeOurWorkgroupTriggers(from model: ProfileModel,
+                                           workgroupID: String = ClaudeCodeWorkgroupTemplate.ID.workgroup,
+                                           jobName: String = "claude") {
         for profile in model.bookmarks() {
             // Skip dynamic profiles that aren't rewritable — the
             // dynamic profile manager regenerates them from disk so
@@ -381,7 +383,9 @@ class ClaudeCodeOnboarding: NSObject {
             guard let triggers = profile[KEY_TRIGGERS] as? [[String: Any]] else {
                 continue
             }
-            let filtered = removingClaudeWorkgroupTriggers(triggers)
+            let filtered = removingWorkgroupTriggers(triggers,
+                                                     workgroupID: workgroupID,
+                                                     jobName: jobName)
             if filtered.count != triggers.count {
                 model.setObject(filtered, forKey: KEY_TRIGGERS, inBookmark: profile)
             }
@@ -393,22 +397,28 @@ class ClaudeCodeOnboarding: NSObject {
     // workgroup, or an Exit trigger filtered on "claude"). Matches regardless
     // of the leaderOnly flag so an older, pre-leaderOnly Exit trigger is still
     // recognized (and thus removed/replaced on reinstall and uninstall).
-    private static func isClaudeWorkgroupTrigger(_ dict: [String: Any]) -> Bool {
+    private static func isWorkgroupTrigger(_ dict: [String: Any],
+                                           workgroupID: String,
+                                           jobName: String) -> Bool {
         guard let action = dict[kTriggerActionKey] as? String else { return false }
         if action == "iTermEnterWorkgroupTrigger",
-           (dict[kTriggerParameterKey] as? String) == ClaudeCodeWorkgroupTemplate.ID.workgroup {
+           (dict[kTriggerParameterKey] as? String) == workgroupID {
             return true
         }
         if action == "iTermExitWorkgroupTrigger",
            let params = dict[kTriggerEventParamsKey] as? [String: Any],
-           (params["jobName"] as? String) == "claude" {
+           (params["jobName"] as? String) == jobName {
             return true
         }
         return false
     }
 
-    private static func removingClaudeWorkgroupTriggers(_ triggers: [[String: Any]]) -> [[String: Any]] {
-        return triggers.filter { !isClaudeWorkgroupTrigger($0) }
+    private static func removingWorkgroupTriggers(_ triggers: [[String: Any]],
+                                                  workgroupID: String = ClaudeCodeWorkgroupTemplate.ID.workgroup,
+                                                  jobName: String = "claude") -> [[String: Any]] {
+        return triggers.filter {
+            !isWorkgroupTrigger($0, workgroupID: workgroupID, jobName: jobName)
+        }
     }
 
     // Add our Enter/Exit triggers to a profile, first removing any older copies
@@ -416,12 +426,16 @@ class ClaudeCodeOnboarding: NSObject {
     // upgrades in place. TriggerController.add dedupes by exact dictionary, so
     // without this strip a flagless Exit trigger would survive *alongside* the
     // new leaderOnly one and keep firing on peers.
-    private static func addClaudeWorkgroupTriggers(_ triggers: [Trigger],
-                                                   toProfileWithGUID guid: String,
-                                                   in model: ProfileModel) {
+    static func addClaudeWorkgroupTriggers(_ triggers: [Trigger],
+                                           toProfileWithGUID guid: String,
+                                           in model: ProfileModel,
+                                           workgroupID: String = ClaudeCodeWorkgroupTemplate.ID.workgroup,
+                                           jobName: String = "claude") {
         if let profile = model.bookmark(withGuid: guid),
            let existing = profile[KEY_TRIGGERS] as? [[String: Any]] {
-            let stripped = removingClaudeWorkgroupTriggers(existing)
+            let stripped = removingWorkgroupTriggers(existing,
+                                                     workgroupID: workgroupID,
+                                                     jobName: jobName)
             if stripped.count != existing.count {
                 model.setObject(stripped, forKey: KEY_TRIGGERS, inBookmark: profile)
             }
@@ -463,14 +477,16 @@ class ClaudeCodeOnboarding: NSObject {
 
     // Eligibility rule mirrors install: skip non-rewritable dynamic
     // profiles (regenerated from disk, can't hold a merge).
-    private static func profileIsEligibleForClaudeTriggers(_ profile: [AnyHashable: Any]) -> Bool {
+    static func profileIsEligibleForClaudeTriggers(_ profile: [AnyHashable: Any]) -> Bool {
         return !profileIsDynamic(profile) ||
             iTermProfilePreferences.bool(forKey: KEY_DYNAMIC_PROFILE_REWRITABLE, inProfile: profile)
     }
 
     // Both our Enter trigger (pointing at the Claude Code workgroup) and
     // an Exit trigger filtered on "claude".
-    static func profileHasClaudeWorkgroupTriggers(_ profile: [AnyHashable: Any]) -> Bool {
+    static func profileHasClaudeWorkgroupTriggers(_ profile: [AnyHashable: Any],
+                                                  workgroupID: String = ClaudeCodeWorkgroupTemplate.ID.workgroup,
+                                                  jobName: String = "claude") -> Bool {
         let triggers = (profile[KEY_TRIGGERS] as? [[String: Any]]) ?? []
         var hasEnter = false
         var hasExit = false
@@ -478,11 +494,11 @@ class ClaudeCodeOnboarding: NSObject {
             guard let action = dict[kTriggerActionKey] as? String else { continue }
             if action == "iTermEnterWorkgroupTrigger",
                let param = dict[kTriggerParameterKey] as? String,
-               param == ClaudeCodeWorkgroupTemplate.ID.workgroup {
+               param == workgroupID {
                 hasEnter = true
             } else if action == "iTermExitWorkgroupTrigger",
                       let params = dict[kTriggerEventParamsKey] as? [String: Any],
-                      (params["jobName"] as? String) == "claude",
+                      (params["jobName"] as? String) == jobName,
                       (params[ExitWorkgroupTrigger.leaderOnlyParamKey] as? NSNumber)?.boolValue == true {
                 // Match the installer's scope: an Exit trigger
                 // filtered on "claude". A user-added Exit trigger
@@ -3138,19 +3154,20 @@ class ClaudeCodeOnboarding: NSObject {
         }
     }
 
-    private static func makeEnterWorkgroupTrigger() -> Trigger? {
+    static func makeEnterWorkgroupTrigger(workgroupID: String = ClaudeCodeWorkgroupTemplate.ID.workgroup,
+                                          jobName: String = "claude") -> Trigger? {
         return Trigger(fromUntrustedDict: [
             kTriggerActionKey: "iTermEnterWorkgroupTrigger",
             kTriggerRegexKey: "",
             kTriggerMatchTypeKey: NSNumber(value: iTermTriggerMatchType.eventJobStarted.rawValue),
-            kTriggerParameterKey: ClaudeCodeWorkgroupTemplate.ID.workgroup,
+            kTriggerParameterKey: workgroupID,
             kTriggerPartialLineKey: NSNumber(value: false),
             kTriggerDisabledKey: NSNumber(value: false),
-            kTriggerEventParamsKey: ["jobName": "claude"]
+            kTriggerEventParamsKey: ["jobName": jobName]
         ])
     }
 
-    private static func makeExitWorkgroupTrigger() -> Trigger? {
+    static func makeExitWorkgroupTrigger(jobName: String = "claude") -> Trigger? {
         return Trigger(fromUntrustedDict: [
             kTriggerActionKey: "iTermExitWorkgroupTrigger",
             kTriggerRegexKey: "",
@@ -3162,7 +3179,7 @@ class ClaudeCodeOnboarding: NSObject {
             // workgroup down. Peers (Code Review, Diff) inherit this trigger
             // via the profile, and their own claude ending or reloading must
             // not exit the whole workgroup.
-            kTriggerEventParamsKey: ["jobName": "claude", "leaderOnly": NSNumber(value: true)]
+            kTriggerEventParamsKey: ["jobName": jobName, "leaderOnly": NSNumber(value: true)]
         ])
     }
 

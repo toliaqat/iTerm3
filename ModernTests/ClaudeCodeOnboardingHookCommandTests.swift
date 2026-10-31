@@ -246,4 +246,18 @@ final class ClaudeCodeOnboardingHookCommandTests: XCTestCase {
         XCTAssertFalse(fm.fileExists(atPath: directory.path))
         XCTAssertTrue(fm.fileExists(atPath: other.path))
     }
+
+    // The Copilot CLI workgroup's Code Review peer runs Copilot, read-only and marked as a reviewer.
+    func testCopilotWorkgroupReviewsWithCopilot() {
+        let review = CopilotCLIWorkgroupTemplate.config.sessions.first { $0.mode == .codeReview }
+        XCTAssertEqual(review?.uniqueIdentifier, CopilotCLIWorkgroupTemplate.ID.review)
+        let command = review?.command ?? ""
+        XCTAssertTrue(command.hasPrefix("env ITERM2_CODE_REVIEW=1 copilot "))
+        XCTAssertTrue(command.contains("--deny-tool=write"))
+        XCTAssertTrue(command.contains("\\(codeReviewSystemPromptFile)"))
+        XCTAssertTrue(ClaudeCodeWorkgroupTemplate.config.sessions.contains {
+            $0.mode == .codeReview && $0.command.hasPrefix("claude ")
+        })
+    }
 }
+
