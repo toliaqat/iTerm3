@@ -219,4 +219,31 @@ final class ClaudeCodeOnboardingHookCommandTests: XCTestCase {
             XCTAssertTrue(H.isInstallerForm(command))
         }
     }
+
+    // The skill names the installed helper, the helper names it2, and uninstall leaves the
+    // user's own skills alone.
+    func testCopilotWorkspaceSkillInstall() throws {
+        let fm = FileManager.default
+        let home = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: home) }
+        let other = home.appendingPathComponent("skills/mine/SKILL.md")
+        try fm.createDirectory(at: other.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "---\nname: mine\n---\n".write(to: other, atomically: true, encoding: .utf8)
+
+        let it2 = "/Users/x/My Config/iterm2/it2"
+        try CopilotCLIIntegration.installSkill(home: home, it2Path: it2)
+        XCTAssertTrue(CopilotCLIIntegration.skillInstalled(home: home))
+        let directory = CopilotCLIIntegration.skillDirectoryURL(home: home)
+        let helper = directory.appendingPathComponent("ws")
+        let skill = try String(contentsOf: directory.appendingPathComponent("SKILL.md"), encoding: .utf8)
+        XCTAssertTrue(skill.contains("WS=\"\(helper.path)\""))
+        XCTAssertFalse(skill.contains("__WS_PATH__"))
+        let script = try String(contentsOf: helper, encoding: .utf8)
+        XCTAssertTrue(script.contains("IT2=\"${IT2:-\(it2)}\""))
+        XCTAssertTrue(fm.isExecutableFile(atPath: helper.path))
+
+        try CopilotCLIIntegration.uninstall(home: home)
+        XCTAssertFalse(fm.fileExists(atPath: directory.path))
+        XCTAssertTrue(fm.fileExists(atPath: other.path))
+    }
 }

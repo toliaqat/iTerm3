@@ -15,6 +15,10 @@
 		FE2DE1ED09FAE9E9F198286A /* ClaudeCodeHookSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D9A81913C0C93D1222686D /* ClaudeCodeHookSettings.swift */; };
 		1CFBC8DDC0F47C682E8BA689 /* it2.py in Resources */ = {isa = PBXBuildFile; fileRef = 7FEACD97BE4694F8EA0745A9 /* it2.py */; };
 		640AE7AAB1BDCC09B531A3AC /* it2.py in Resources */ = {isa = PBXBuildFile; fileRef = 7FEACD97BE4694F8EA0745A9 /* it2.py */; };
+		59EE117E35094DABB56B43DC /* iterm2-workspace-SKILL.md in Resources */ = {isa = PBXBuildFile; fileRef = E0A687DECD9F4673ADF2ECEB /* iterm2-workspace-SKILL.md */; };
+		C94B756A56174681B375F2B4 /* iterm2-workspace-SKILL.md in Resources */ = {isa = PBXBuildFile; fileRef = E0A687DECD9F4673ADF2ECEB /* iterm2-workspace-SKILL.md */; };
+		347ADC8342A0439DA4DED069 /* iterm2-workspace-ws.sh in Resources */ = {isa = PBXBuildFile; fileRef = 7CACC66E36044F3799B91EC7 /* iterm2-workspace-ws.sh */; };
+		FD31EB8CDB574E95B7CDF604 /* iterm2-workspace-ws.sh in Resources */ = {isa = PBXBuildFile; fileRef = 7CACC66E36044F3799B91EC7 /* iterm2-workspace-ws.sh */; };
 		DAB9BA82D680E9AB6B3043D7 /* iTermFloatingPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F500F98D6607037DCEB270 /* iTermFloatingPaneView.swift */; };
 		016EA28EFFD974B8FFD140E3 /* KittyDnDMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84F2877106D3AD27A8ED6583 /* KittyDnDMessage.swift */; };
 		01A01787661B9E1F5177DAB7 /* iTermJobTerminationMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 677BAE3BF6167A6719904C54 /* iTermJobTerminationMonitor.swift */; };
@@ -6065,6 +6069,8 @@
 		7F7C79A0745E993B91C40235 /* WorkgroupToolbarBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkgroupToolbarBuilder.swift; sourceTree = "<group>"; };
 		AFD50FEF7599E1BBCD195581 /* it2_git_state.py */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.script.python; name = it2_git_state.py; path = OtherResources/it2_git_state.py; sourceTree = "<group>"; };
 		7FEACD97BE4694F8EA0745A9 /* it2.py */ = {isa = PBXFileReference; includeInIndex = 1; name = it2.py; path = OtherResources/it2.py; sourceTree = "<group>"; };
+		E0A687DECD9F4673ADF2ECEB /* iterm2-workspace-SKILL.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; name = iterm2-workspace-SKILL.md; path = OtherResources/CopilotSkill/iterm2-workspace-SKILL.md; sourceTree = "<group>"; };
+		7CACC66E36044F3799B91EC7 /* iterm2-workspace-ws.sh */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.script.sh; name = iterm2-workspace-ws.sh; path = OtherResources/CopilotSkill/iterm2-workspace-ws.sh; sourceTree = "<group>"; };
 		80A64098B399CE71B981E2C7 /* iTermRenderingComparer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = iTermRenderingComparer.swift; sourceTree = "<group>"; };
 		80B6F3668D68E11BAEA54060 /* iTermLayoutSpec.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = iTermLayoutSpec.swift; sourceTree = "<group>"; };
 		81E145AE29B68F8F2A69891A /* iTermLocatedString+ScreenCharArray.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "iTermLocatedString+ScreenCharArray.swift"; sourceTree = "<group>"; };
@@ -9671,6 +9677,8 @@
 				A65DF4A42849C11D00AA29AB /* bash-si-loader */,
 				DF18C01510605DB0C639038F /* ai-models.json */,
 				7FEACD97BE4694F8EA0745A9 /* it2.py */,
+				E0A687DECD9F4673ADF2ECEB /* iterm2-workspace-SKILL.md */,
+				7CACC66E36044F3799B91EC7 /* iterm2-workspace-ws.sh */,
 				AFD50FEF7599E1BBCD195581 /* it2_git_state.py */,
 				E7CD7C850CA3B436FB0CF26C /* it2-remote */,
 			);
@@ -17729,6 +17737,8 @@
 				3EB88252C886C05D366D3A5A /* repl_banner-pt-BR.txt in Resources */,
 				65B1B9DF105B29AAF3D6D77F /* companion-browser-editing.js in Resources */,
 				640AE7AAB1BDCC09B531A3AC /* it2.py in Resources */,
+				C94B756A56174681B375F2B4 /* iterm2-workspace-SKILL.md in Resources */,
+				FD31EB8CDB574E95B7CDF604 /* iterm2-workspace-ws.sh in Resources */,
 				923F4778B3116EBDC9D56980 /* it2_git_state.py in Resources */,
 				A4DA57992DB5D9D843661F94 /* it2-remote in Resources */,
 			);
@@ -18429,6 +18439,8 @@
 				498710E58A37DCA1EC3BB12C /* repl_banner-pt-BR.txt in Resources */,
 				D40FA74614B9343BFA69E64D /* companion-browser-editing.js in Resources */,
 				1CFBC8DDC0F47C682E8BA689 /* it2.py in Resources */,
+				59EE117E35094DABB56B43DC /* iterm2-workspace-SKILL.md in Resources */,
+				347ADC8342A0439DA4DED069 /* iterm2-workspace-ws.sh in Resources */,
 				72386C923E6555FC1BEE219E /* it2_git_state.py in Resources */,
 				9EC3C7C85EB065688CB08F0C /* it2-remote in Resources */,
 			);

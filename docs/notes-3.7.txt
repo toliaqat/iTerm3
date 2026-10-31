@@ -106,6 +106,12 @@ New Features:
   Copilot CLI Integration. It shows when Copilot
   is working, waiting for you, done (with its
   last reply), or has failed.
+- The Copilot CLI integration also installs an
+  “iterm2-workspace” skill. Ask a Copilot
+  session to split up a job and it opens other
+  agents in tabs of its project, sends them
+  prompts, waits for them, and reads their
+  results. Tabs it opens can’t do the same.
 - Right-clicking your own message in AI chat now
   offers Delete, which removes that message and
   everything after it. Edit, Fork, and Delete are

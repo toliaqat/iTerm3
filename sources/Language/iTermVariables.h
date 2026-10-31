@@ -26,6 +26,7 @@ extern NSString *const iTermVariableKeyTabCurrentSession;
 extern NSString *const iTermVariableKeyTabID;
 extern NSString *const iTermVariableKeyTabTmuxWindowTitle;  // #{T:set-titles-string} for a particular tmux window
 extern NSString *const iTermVariableKeyTabTmuxWindowName;
+extern NSString *const iTermVariableKeyTabProjectPath;
 extern NSString *const iTermVariableKeyTabWindow;
 extern NSString *const iTermVariableKeyTabTitle;
 

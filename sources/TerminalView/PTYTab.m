@@ -7848,6 +7848,11 @@ typedef struct {
     return _variablesScope;
 }
 
+- (void)setTabGroupProjectPath:(NSString *)tabGroupProjectPath {
+    _tabGroupProjectPath = [tabGroupProjectPath copy];
+    [self.variablesScope setValue:_tabGroupProjectPath forVariableNamed:iTermVariableKeyTabProjectPath];
+}
+
 - (id)valueForVariable:(NSString *)name {
     return [self.variablesScope valueForVariableName:name];
 }

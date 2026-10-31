@@ -114,6 +114,7 @@
     [self recordUseOfVariableNamed:iTermVariableKeyTabTmuxWindowTitle inContext:iTermVariablesSuggestionContextTab];
     [self recordUseOfVariableNamed:iTermVariableKeyTabTmuxWindow inContext:iTermVariablesSuggestionContextTab];
     [self recordUseOfVariableNamed:iTermVariableKeyTabID inContext:iTermVariablesSuggestionContextTab];
+    [self recordUseOfVariableNamed:iTermVariableKeyTabProjectPath inContext:iTermVariablesSuggestionContextTab];
     [self recordUseOfNonterminalVariableNamed:iTermVariableKeyTabWindow
                                     inContext:iTermVariablesSuggestionContextTab
                              leadingToContext:iTermVariablesSuggestionContextWindow];

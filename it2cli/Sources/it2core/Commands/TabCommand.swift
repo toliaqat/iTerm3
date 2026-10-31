@@ -39,6 +39,9 @@ extension Tab {
         @Option(name: .shortAndLong, help: "Command to run.")
         var command: String?
 
+        @Flag(name: .long, help: "Print the new tab’s ID and its session’s ID as JSON.")
+        var json = false
+
         func run(_ ctx: IT2Context) throws {
             let client = try ctx.makeClient()
             defer { client.disconnect() }
@@ -66,7 +69,11 @@ extension Tab {
                 throw IT2Error.apiError("Failed to create tab: status \(tabResp.status.rawValue)")
             }
 
-            ctx.out("Created new tab: \(tabResp.tabId)")
+            if json {
+                ctx.printJSON(["tab_id": "\(tabResp.tabId)", "session_id": tabResp.sessionId ?? ""])
+            } else {
+                ctx.out("Created new tab: \(tabResp.tabId)")
+            }
 
             if let command = command, let sessionId = tabResp.sessionId {
                 let sendText = ITMSendTextRequest()

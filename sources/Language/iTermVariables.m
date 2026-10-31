@@ -39,6 +39,7 @@ NSString *const iTermVariableKeyTabTitleOverride = @"titleOverride";
 NSString *const iTermVariableKeyTabTitleOverrideFormat = @"titleOverrideFormat";
 NSString *const iTermVariableKeyTabTmuxWindowTitle = @"tmuxWindowTitle";  // tmux window title if set-title is on, comes from evaluating set-titles-strings
 NSString *const iTermVariableKeyTabTmuxWindowName = @"tmuxWindowName";
+NSString *const iTermVariableKeyTabProjectPath = @"projectPath";  // folder of the project tab group the tab is in
 NSString *const iTermVariableKeyTabCurrentSession = @"currentSession";
 NSString *const iTermVariableKeyTabTmuxWindow = @"tmuxWindow";
 NSString *const iTermVariableKeyTabID = @"id";
