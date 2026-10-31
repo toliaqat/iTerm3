@@ -31,37 +31,30 @@ final class WorkgroupModeSwitcherItem: SessionToolbarControl {
                     shortcut: WorkgroupToolbarShortcut?)],
          activeIdentifier: String) {
         self.identifiers = members.map { $0.identifier }
-        // Suffix each label with its activation shortcut. When the
-        // peer has a configured `peerSwitchShortcut`, render that —
-        // it's the binding that actually fires. Otherwise fall back
-        // to the built-in ⌥⇧⌘1..8 for the first eight segments;
-        // ⌥⇧⌘9 also appears on the last segment when there are nine
-        // or more peers (so the "always go to last" hint is visible).
-        // For ≤8 peers the direct number wins on the last segment
-        // because it's how the user thinks ("press 5 for the 5th peer").
-        let labels = members.enumerated().map { (index, member) -> String in
-            let suffix: String?
+        // Segments show only the peer's name to save width. Its
+        // activation shortcut goes in the tooltip: a configured
+        // `peerSwitchShortcut` if there is one, else the built-in
+        // ⌥⇧⌘1..8 (and ⌥⇧⌘9 for the last of nine or more peers).
+        let shortcuts = members.enumerated().map { (index, member) -> String? in
             if let custom = member.shortcut,
                let keystroke = custom.keystroke {
-                suffix = iTermKeystrokeFormatter.string(for: keystroke)
-            } else {
-                suffix = Self.shortcutLabel(forSegmentIndex: index,
-                                            total: members.count)
+                return iTermKeystrokeFormatter.string(for: keystroke)
             }
-            guard let suffix, !suffix.isEmpty else {
-                return member.label
-            }
-            // U+2003 EM SPACE — wider than a regular space so the
-            // shortcut hint reads as a separate visual cluster from
-            // the peer's name.
-            return "\(member.label)\u{2003}\(suffix)"
+            return Self.shortcutLabel(forSegmentIndex: index,
+                                      total: members.count)
         }
+        let labels = members.map { $0.label }
         segmentedControl = WorkgroupPeerSegmentedControl(
             labels: labels,
             trackingMode: .selectOne,
             target: nil,
             action: #selector(modeChanged(_:)))
         segmentedControl.segmentStyle = .texturedRounded
+        for (index, shortcut) in shortcuts.enumerated() {
+            if let shortcut, !shortcut.isEmpty {
+                segmentedControl.setToolTip(shortcut, forSegment: index)
+            }
+        }
         if let idx = identifiers.firstIndex(of: activeIdentifier) {
             segmentedControl.selectedSegment = idx
         }
