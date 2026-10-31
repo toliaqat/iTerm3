@@ -6973,6 +6973,30 @@
         }
       }
     },
+    "Cp1-in-CLI.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Install Copilot CLI Integration\"; ObjectID = \"Cp1-in-CLI\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Install Copilot CLI Integration"
+          }
+        }
+      }
+    },
+    "Cp2-un-CLI.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Uninstall Copilot CLI Integration\"; ObjectID = \"Cp2-un-CLI\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Uninstall Copilot CLI Integration"
+          }
+        }
+      }
+    },
     "aNs-El-c10.title" : {
       "comment" : "Class = \"NSMenuItem\"; title = \"Annotate Selection\"; ObjectID = \"aNs-El-c10\";",
       "extractionState" : "extracted_with_value",

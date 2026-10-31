@@ -1,0 +1,8 @@
+{
+  "cwd": "/Users/user/github/cc-status",
+  "hook_event_name": "SessionStart",
+  "initial_prompt": "Reply with HELLO.",
+  "session_id": "ec95c531-526a-4508-8fa1-cb8885a0630c",
+  "source": "new",
+  "timestamp": "2026-10-31T04:22:03.687Z"
+}

@@ -75,6 +75,7 @@ final class ClaudeCodeOnboardingHookCommandTests: XCTestCase {
         XCTAssertTrue(H.isInstallerForm("/Users/x/.config/iterm2/cc-status"))
         XCTAssertTrue(H.isInstallerForm("\"/Users/x/.config/iterm2-alt4/it2\" handle-agent-hook"))
         XCTAssertTrue(H.isInstallerForm("\"/Users/x y/.config/iterm2/it2\" handle-agent-hook --agent codex"))
+        XCTAssertTrue(H.isInstallerForm("\"/Users/x/.config/iterm2/it2\" handle-agent-hook --agent copilot"))
         XCTAssertFalse(H.isInstallerForm("$HOME/.config/iterm2/it2 handle-agent-hook"))
         XCTAssertFalse(H.isInstallerForm("/Users/x/.config/iterm2/it2 handle-agent-hook"), "unquoted: the user's")
         XCTAssertFalse(H.isInstallerForm("\"/Users/x/.config/iterm2/it2\" handle-agent-hook; say done"))
@@ -199,5 +200,23 @@ final class ClaudeCodeOnboardingHookCommandTests: XCTestCase {
                                                         ["type": "command", "command": mine]]]]]
         let merged = ClaudeCodeOnboarding.mergedHooks(hooks, command: it2, isExecutable: { _ in true })
         XCTAssertEqual(commands(merged, "Stop"), [it2, mine])
+    }
+
+    // Copilot CLI reads {"version":1,"hooks":{Event:[{"type":"command","bash":…}]}}. Its
+    // PermissionRequest fires for allowed tools too, so it is left out.
+    func testCopilotHooksFile() throws {
+        let command = "\"/Users/x/.config/iterm2/it2\" handle-agent-hook --agent copilot"
+        let data = try CopilotCLIIntegration.hooksFileContents(command: command)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["version"] as? Int, 1)
+        let hooks = try XCTUnwrap(json["hooks"] as? [String: [[String: Any]]])
+        XCTAssertEqual(Set(hooks.keys), Set(CopilotCLIIntegration.events))
+        XCTAssertNil(hooks["PermissionRequest"])
+        for (_, entries) in hooks {
+            XCTAssertEqual(entries.count, 1)
+            XCTAssertEqual(entries[0]["type"] as? String, "command")
+            XCTAssertEqual(entries[0]["bash"] as? String, command)
+            XCTAssertTrue(H.isInstallerForm(command))
+        }
     }
 }

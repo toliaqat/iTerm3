@@ -234,7 +234,7 @@ final class AgentHookScenarioTests: XCTestCase {
                 backend.finishOnStatusWrite = flags.contains(.finishOnStatusWrite)
                 backend.promptAfterJSON = flags.contains(.promptAfterJSON)
                 backend.killAfter = flags.contains(.killAfterOne) ? 1 : nil
-                let agent: AgentKind = fixture.hasPrefix("codex/") ? .codex : .claude
+                let agent: AgentKind = fixture.hasPrefix("codex/") ? .codex : fixture.hasPrefix("copilot/") ? .copilot : .claude
                 var stderr: [String] = []
                 var killed = false
                 do {
@@ -515,6 +515,63 @@ final class AgentHookScenarioTests: XCTestCase {
             .hook("claude/PostToolUse-Bash", [Self.setStatus(Self.WORKING, Self.detail(""), Self.EXPIRES)]),
             .hook("claude/Stop-nobg", [Self.setStatus(Self.DONE, Self.detail("HELLO"), ["--background-tasks=0"])]),
         ])
+    }
+
+    // MARK: - Copilot CLI
+
+    // Copilot CLI draws its own ring for the whole turn, so it gets Claude's turn-scoped status.
+    // Its Stop names a transcript the fixture's path doesn't reach, so the detail is cleared.
+    func testCopilotPlainTurn() throws {
+        try run("copilot: plain turn", [
+            .hook("copilot/SessionStart", [Self.setStatus(Self.IDLE, Self.detail(""), ["--background-tasks=0"], boundary: true)]),
+            .hook("copilot/UserPromptSubmit", [Self.setStatus(Self.WORKING, Self.detail(""), Self.EXPIRES)]),
+            .hook("copilot/PreToolUse-Bash", [Self.setStatus(Self.WORKING, Self.detail(""), Self.EXPIRES)]),
+            .hook("copilot/PostToolUseFailure-Bash", [Self.setStatus(Self.WORKING, Self.detail(""), Self.EXPIRES)]),
+            .hook("copilot/PostToolUse-Bash", [Self.setStatus(Self.WORKING, Self.detail(""), Self.EXPIRES)]),
+            .hook("copilot/Stop", [Self.setStatus(Self.DONE, Self.detail(""))]),
+            .hook("copilot/SessionEnd", [Self.setStatus(Self.IDLE, Self.detail(""), ["--background-tasks=0"], boundary: true)]),
+        ])
+    }
+
+    func testCopilotWaitsOnlyForPromptsThatNeedTheUser() throws {
+        try run("copilot: waits only for prompts that need the user", [
+            .hook("copilot/UserPromptSubmit", [Self.setStatus(Self.WORKING, Self.detail(""), Self.EXPIRES)]),
+            .hook("copilot/Notification-permission_prompt",
+                  [Self.setStatus(Self.WAITING, Self.detail("Allow Copilot to run echo hi?"), Self.EXPIRES)]),
+            .hook("copilot/Notification-shell_completed", []),
+        ])
+    }
+
+    func testCopilotOnlyAnUnrecoverableErrorEndsTheTurn() throws {
+        try run("copilot: only an unrecoverable error ends the turn", [
+            .hook("copilot/UserPromptSubmit", [Self.setStatus(Self.WORKING, Self.detail(""), Self.EXPIRES)]),
+            .hook("copilot/ErrorOccurred-recoverable", []),
+            .hook("copilot/ErrorOccurred-fatal", [Self.setStatus(Self.ERROR, Self.detail("Rate limit exceeded"))]),
+        ])
+    }
+
+    func testCopilotStopReadsTheLastMessageFromItsTranscript() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let transcript = dir.appendingPathComponent("events.jsonl")
+        let lines = [
+            #"{"type":"assistant.message","data":{"content":"Working on it"}}"#,
+            #"{"type":"tool.execution_complete","data":{}}"#,
+            #"{"type":"assistant.message","data":{"content":"All\n  DONE"}}"#,
+            #"{"type":"assistant.message","data":{"content":""}}"#,
+            #"{"type":"assistant.turn_end","data":{}}"#,
+        ]
+        try (lines.joined(separator: "\n") + "\n").write(to: transcript, atomically: true, encoding: .utf8)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: try payload("copilot/Stop")) as? [String: Any])
+        json["transcript_path"] = transcript.path
+        let backend = FakeAgentStatusBackend()
+        try AgentHookHandler.handle(payload: try JSONSerialization.data(withJSONObject: json),
+                                    agent: .copilot,
+                                    environment: Self.environment,
+                                    backend: backend,
+                                    report: { _ in })
+        XCTAssertEqual(backend.calls, [Self.setStatus(Self.DONE, Self.detail("All DONE"))])
     }
 
     func testClaudeTheIdleNudgeLeavesAFinishedTurnAlone() throws {

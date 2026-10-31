@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/user/github/cc-status",
+  "error": {
+    "message": "Connection reset",
+    "name": "Error",
+    "stack": ""
+  },
+  "error_context": "model_call",
+  "hook_event_name": "ErrorOccurred",
+  "recoverable": true,
+  "session_id": "ec95c531-526a-4508-8fa1-cb8885a0630c",
+  "timestamp": "2026-10-31T04:22:03.687Z"
+}

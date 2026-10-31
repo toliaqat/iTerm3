@@ -101,6 +101,11 @@ New Features:
   that started it. The tab gets a progress
   indicator too, which Codex does not draw for
   itself.
+- The Session Status tool can now follow GitHub
+  Copilot CLI too. Choose iTerm2 > Install
+  Copilot CLI Integration. It shows when Copilot
+  is working, waiting for you, done (with its
+  last reply), or has failed.
 - Right-clicking your own message in AI chat now
   offers Delete, which removes that message and
   everything after it. Edit, Fork, and Delete are

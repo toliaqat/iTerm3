@@ -4722,6 +4722,7 @@
 		CCBFF5C9FA0B931ADA3F66F6 /* iTermRemoteDataFileSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ACD26966C02B9319DD9A9EF /* iTermRemoteDataFileSync.swift */; };
 		CD2E8590B507B08EBD3313A3 /* iTermCompactProxyIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6CB27B6647329ACD05CE222 /* iTermCompactProxyIconView.swift */; };
 		CD388563D594128FAE60C524 /* iTermScriptCallCancellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E172337D1463B9CDE359B55 /* iTermScriptCallCancellation.swift */; };
+		CDB2CF5333BD1CA981140F83 /* CopilotCLIIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B58F550EFB7285E6D7306A /* CopilotCLIIntegration.swift */; };
 		CDCC2B56B9ECB9B461A9EEFA /* AITabTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45FB9AAD273DCCA975189D9B /* AITabTitleGenerator.swift */; };
 		CE902D9AE7A0A17744578496 /* iTermRecordingProfileSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25F400887FD7A5B23D916AD9 /* iTermRecordingProfileSanitizer.swift */; };
 		CF138846630690AA6A7BCFD5 /* iTermGitClient.m in Sources */ = {isa = PBXBuildFile; fileRef = A687B66925AD6FF600E0A658 /* iTermGitClient.m */; };
@@ -9090,6 +9091,7 @@
 		F6E708B70A9D0EA400D0C4EF /* PSMTabDragAssistant.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = PSMTabDragAssistant.h; sourceTree = "<group>"; };
 		F6E708B80A9D0EA400D0C4EF /* PSMTabDragAssistant.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = PSMTabDragAssistant.m; sourceTree = "<group>"; };
 		F790CA240B9BA05F26567E86 /* AILiveAttachmentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AILiveAttachmentTests.swift; sourceTree = "<group>"; };
+		F7B58F550EFB7285E6D7306A /* CopilotCLIIntegration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CopilotCLIIntegration.swift; sourceTree = "<group>"; };
 		F7D9A81913C0C93D1222686D /* ClaudeCodeHookSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClaudeCodeHookSettings.swift; sourceTree = "<group>"; };
 		F900014EDED3405CB4AD86C9 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/NumberOfSpacesAccessoryView.xib; sourceTree = "<group>"; };
 		F90733DD8ECD8EDFD8F5D0BC /* mul */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = mul; path = mul.lproj/BulkCopyProfilePreferences.xcstrings; sourceTree = "<group>"; };
@@ -14428,6 +14430,7 @@
 				F0CF78DCB35283C048B0B54A /* CockpitWindowController.swift */,
 				0586F89994212302FC06BE82 /* Orchestration */,
 				A446BD7ECEC99A42DD383E59 /* CCStatusHookCommand.swift */,
+				F7B58F550EFB7285E6D7306A /* CopilotCLIIntegration.swift */,
 			);
 			path = ClaudeCode;
 			sourceTree = "<group>";
@@ -20430,6 +20433,7 @@
 				7A50926FEAEFE4F9AC35D65D /* ToolFiles.swift in Sources */,
 				8E90B6A7372B8F9716EFD23E /* ToolFilesEditor.swift in Sources */,
 				800C79C4DD60FFBB9F8213DB /* iTermFilesTitlebarAccessoryViewController.swift in Sources */,
+				CDB2CF5333BD1CA981140F83 /* CopilotCLIIntegration.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

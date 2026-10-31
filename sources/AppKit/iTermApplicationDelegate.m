@@ -493,6 +493,10 @@ static NSModalResponse iTermCompareRenderingRunModal(id self, SEL _cmd) {
         return [[iTermClaudeCodeIntegrationMenuController shared] validateReinstallMenuItem:menuItem];
     } else if ([menuItem action] == @selector(uninstallClaudeCodeIntegration:)) {
         return [[iTermClaudeCodeIntegrationMenuController shared] validateUninstallMenuItem:menuItem];
+    } else if ([menuItem action] == @selector(installCopilotCLIIntegration:)) {
+        return [[iTermCopilotCLIIntegrationMenuController shared] validateInstallMenuItem:menuItem];
+    } else if ([menuItem action] == @selector(uninstallCopilotCLIIntegration:)) {
+        return [[iTermCopilotCLIIntegrationMenuController shared] validateUninstallMenuItem:menuItem];
     } else if (menuItem == maximizePane) {
         if ([[[iTermController sharedInstance] currentTerminal] inInstantReplay]) {
             // Things get too complex if you allow this. It crashes.
@@ -1862,7 +1866,8 @@ void TurnOnDebugLoggingAutomatically(void) {
     // touching the dot dir and a symlink on every launch.
     // reconcileHooksCache above just refreshed the flag from disk, so
     // a manual edit of ~/.claude/settings.json is detected next launch.
-    if ([iTermClaudeCodeOnboarding hooksAlreadyInstalled]) {
+    // Copilot CLI's hook file names the same it2 symlink.
+    if ([iTermClaudeCodeOnboarding hooksAlreadyInstalled] || [iTermCopilotCLIIntegration isInstalled]) {
         NSString *previousVersion = [iTermPreferences appVersionBeforeThisLaunch];
         NSString *currentVersion = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleVersion"];
         const BOOL launchedNewerVersion =
@@ -2748,6 +2753,14 @@ static iTermKeyEventReplayer *gReplayer;
 
 - (IBAction)uninstallClaudeCodeIntegration:(id)sender {
     [[iTermClaudeCodeIntegrationMenuController shared] uninstall:sender];
+}
+
+- (IBAction)installCopilotCLIIntegration:(id)sender {
+    [[iTermCopilotCLIIntegrationMenuController shared] install:sender];
+}
+
+- (IBAction)uninstallCopilotCLIIntegration:(id)sender {
+    [[iTermCopilotCLIIntegrationMenuController shared] uninstall:sender];
 }
 
 #pragma mark - Main Menu

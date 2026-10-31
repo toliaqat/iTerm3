@@ -58,8 +58,15 @@ enum AgentHookHandler {
                        inProcess: Bool = false,
                        backend: AgentStatusBackend,
                        report: @escaping (String) -> Void) throws {
-        guard let event = readAgentHookEvent(payload) else {
+        guard var event = readAgentHookEvent(payload) else {
             return
+        }
+        // Copilot CLI's Stop names its transcript instead of carrying the last message. Only read
+        // it when the hook runs where the agent does: in-process, the path is on another host.
+        if agent == .copilot, !inProcess, event.name == "Stop", event.json["last_assistant_message"] == nil,
+           let path = event.json["transcript_path"] as? String,
+           let message = AgentHookDetail.copilotLastAssistantMessage(transcriptPath: path) {
+            event.json["last_assistant_message"] = message
         }
         guard let address = resolveAgentHookAddress(environment: environment,
                                                     originSessionID: originSessionID,

@@ -139,7 +139,7 @@ enum CCStatusHookCommand {
             return false
         }
         let rest = words.dropFirst(2).map(\.literalTail)
-        return rest.isEmpty || rest == ["--agent", "codex"]
+        return rest.isEmpty || rest == ["--agent", "codex"] || rest == ["--agent", "copilot"]
     }
 
     /// True if `command` is exactly one unquoted absolute path, the form the installer wrote before

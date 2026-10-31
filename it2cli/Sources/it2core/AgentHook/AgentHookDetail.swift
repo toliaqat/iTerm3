@@ -60,6 +60,36 @@ enum AgentHookDetail {
         return (json["last_assistant_message"] as? String).map { condense($0) } ?? ""
     }
 
+    /// The last non-empty assistant message in a Copilot CLI transcript (events.jsonl), read from
+    /// the end of the file, or nil.
+    static func copilotLastAssistantMessage(transcriptPath: String, maxBytes: Int = 256 * 1024) -> String? {
+        guard transcriptPath.hasSuffix("/events.jsonl"),
+              let handle = FileHandle(forReadingAtPath: transcriptPath) else {
+            return nil
+        }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else {
+            return nil
+        }
+        let start = size > UInt64(maxBytes) ? size - UInt64(maxBytes) : 0
+        guard (try? handle.seek(toOffset: start)) != nil,
+              let data = try? handle.readToEnd(),
+              let text = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        for line in text.split(separator: "\n").reversed() {
+            guard line.contains("\"assistant.message\""),
+                  let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                  object["type"] as? String == "assistant.message",
+                  let content = (object["data"] as? [String: Any])?["content"] as? String,
+                  !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                continue
+            }
+            return content
+        }
+        return nil
+    }
+
     /// Collapse all whitespace runs to single spaces and truncate to ~180 chars so
     /// the toolbelt has room to wrap to three lines.
     static func condense(_ s: String, limit: Int = 180) -> String {

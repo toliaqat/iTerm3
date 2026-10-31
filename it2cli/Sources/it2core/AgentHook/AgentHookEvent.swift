@@ -25,9 +25,19 @@ enum AgentHookPalette {
 /// the turn that started it, has an Interrupt hook for Esc where Claude Code has none, and does
 /// not draw the tab's progress ring for itself. The hook configuration says which one it is,
 /// because session-boundary events carry nothing that could tell them apart.
+///
+/// Copilot CLI, configured with PascalCase event names, sends Claude-shaped payloads and draws the
+/// progress ring for the whole turn as Claude Code does, so it takes the Claude path with three
+/// differences: its Notification also reports background shells and agents finishing, which are
+/// not a reason to wait on the user; its Stop carries no last message, so one is read from the
+/// transcript (see AgentHookHandler); and it reports a failed turn with ErrorOccurred rather than
+/// StopFailure. Its PermissionRequest arrives without hook_event_name, before the permission check
+/// runs even for tools that will be allowed, so it is not installed; Notification's
+/// permission_prompt is the one that means a prompt is up.
 enum AgentKind: String, ExpressibleByArgument, Equatable {
     case claude
     case codex
+    case copilot
 }
 
 /// What one hook event says about the session. Every field is optional: an event may change only
@@ -216,6 +226,7 @@ extension AgentHookRunner {
     func decide(json: [String: Any]) throws -> AgentStatusUpdate? {
         var update = AgentStatusUpdate()
         let isCodex = agent == .codex
+        let isCopilot = agent == .copilot
         let lastMessage = AgentHookDetail.lastMessageDetail(json)
 
         /// The one rule for an event that ends a turn: stay working while background work
@@ -239,7 +250,7 @@ extension AgentHookRunner {
         }
 
         switch eventName {
-        case "UserPromptSubmit", "PreToolUse", "PostToolUse":
+        case "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure":
             update.showWorking(detail: "")  // new turn / tool activity, so previous detail is stale
             update.expiresOnProgressEnd = true
             if eventName == "UserPromptSubmit", isCodex {
@@ -277,6 +288,15 @@ extension AgentHookRunner {
                 // survives the nudge (2.1.201 idle_prompt payloads lack the message);
                 // truthful-but-empty beats sticky-but-possibly-false.
                 endTurn(running: running, ending: .done, detail: lastMessage)
+            } else if isCopilot {
+                // The other types say a background shell or agent finished, which needs nothing
+                // from the user; the turn's own events report the work.
+                guard notificationType == "permission_prompt" || notificationType == "elicitation_dialog" else {
+                    return nil
+                }
+                let message = (json["message"] as? String) ?? (json["title"] as? String)
+                update.showWaiting(detail: message.map { AgentHookDetail.condense($0) } ?? "")
+                update.expiresOnProgressEnd = true
             } else {
                 // Skip detail for permission_prompt (PermissionRequest carries it better).
                 // Other subtypes (auth_success, elicitation_dialog, ...) get the message.
@@ -439,6 +459,13 @@ extension AgentHookRunner {
                 running = try storedBackgroundTaskCount()
             }
             endTurn(running: running, ending: .error, detail: "")
+        case "ErrorOccurred":
+            // Copilot CLI only. A recoverable error is retried within the turn.
+            guard isCopilot, json["recoverable"] as? Bool == false else {
+                return nil
+            }
+            let message = ((json["error"] as? [String: Any])?["message"] as? String).map { AgentHookDetail.condense($0) }
+            endTurn(running: 0, ending: .error, detail: message ?? "")
         case "SessionStart", "SessionEnd":
             update.showIdle(detail: "")  // session boundary, wipe stale detail
             update.backgroundTasks = 0  // and the stored count with it
