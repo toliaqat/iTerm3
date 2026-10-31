@@ -66,12 +66,16 @@ final class iTermAgentSessionsPanel: NSView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let countLabel = NSTextField(labelWithString: "")
     private let refreshButton = NSButton()
+    private let optionsButton = NSButton()
+    private let collapseAllButton = NSButton()
+    private let expandAllButton = NSButton()
     private let separator = NSBox()
     private let scrollView = NSScrollView()
     private let tableView = NSTableView()
     private let emptyLabel = NSTextField(labelWithString: "")
     private var sessions = [iTermAgentSession]()
     private var rows = [iTermAgentSessionsRow]()
+    private var groupKeys = [String]()
     private var projectsSignature = ""
     private var timer: Timer?
     private var dragStart: (mouseY: CGFloat, height: CGFloat)?
@@ -129,15 +133,28 @@ final class iTermAgentSessionsPanel: NSView {
         let reloadTitle = String(localized: "AgentSessions.Reload",
                                  defaultValue: "Reload",
                                  comment: "Button that rescans recent Copilot and Claude Code sessions")
-        refreshButton.image = NSImage.it_image(forSymbolName: SFSymbol.arrowClockwise.rawValue,
-                                               accessibilityDescription: reloadTitle)
-        refreshButton.imageScaling = .scaleProportionallyDown
-        refreshButton.isBordered = false
-        refreshButton.bezelStyle = .regularSquare
-        refreshButton.toolTip = reloadTitle
-        refreshButton.target = self
-        refreshButton.action = #selector(reload(_:))
-        header.addSubview(refreshButton)
+        configureHeaderButton(refreshButton,
+                              symbol: .arrowClockwise,
+                              title: reloadTitle,
+                              action: #selector(reload(_:)))
+        configureHeaderButton(collapseAllButton,
+                              symbol: .rectangleCompressVertical,
+                              title: String(localized: "AgentSessions.CollapseAll",
+                                            defaultValue: "Collapse All Groups",
+                                            comment: "Button that collapses every group in the Agent Sessions list"),
+                              action: #selector(collapseAllGroups(_:)))
+        configureHeaderButton(expandAllButton,
+                              symbol: .rectangleExpandVertical,
+                              title: String(localized: "AgentSessions.ExpandAll",
+                                            defaultValue: "Expand All Groups",
+                                            comment: "Button that expands every group in the Agent Sessions list"),
+                              action: #selector(expandAllGroups(_:)))
+        configureHeaderButton(optionsButton,
+                              symbol: .ellipsisCircle,
+                              title: String(localized: "AgentSessions.Options",
+                                            defaultValue: "Options",
+                                            comment: "Button that shows a menu of options for the Agent Sessions list"),
+                              action: #selector(showOptionsMenu(_:)))
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("session"))
         column.resizingMask = .autoresizingMask
@@ -161,9 +178,6 @@ final class iTermAgentSessionsPanel: NSView {
         scrollView.scrollerStyle = .overlay
         addSubview(scrollView)
 
-        emptyLabel.stringValue = String(localized: "AgentSessions.Empty",
-                                        defaultValue: "No sessions in the last 30 days",
-                                        comment: "Shown when there are no recent Copilot or Claude Code sessions")
         emptyLabel.font = NSFont.systemFont(ofSize: 11)
         emptyLabel.alignment = .center
         emptyLabel.isHidden = true
@@ -176,8 +190,20 @@ final class iTermAgentSessionsPanel: NSView {
         sessions = iTermAgentSessionStore.shared.sessions
         rebuildRows()
         applyTextColor()
+        updateEmptyLabel()
         updateChevron()
         updateCount()
+    }
+
+    private func configureHeaderButton(_ button: NSButton, symbol: SFSymbol, title: String, action: Selector) {
+        button.image = NSImage.it_image(forSymbolName: symbol.rawValue, accessibilityDescription: title)
+        button.imageScaling = .scaleProportionallyDown
+        button.isBordered = false
+        button.bezelStyle = .regularSquare
+        button.toolTip = title
+        button.target = self
+        button.action = action
+        header.addSubview(button)
     }
 
     private func applyTextColor() {
@@ -185,7 +211,9 @@ final class iTermAgentSessionsPanel: NSView {
         countLabel.textColor = textColor.withAlphaComponent(0.5)
         emptyLabel.textColor = textColor.withAlphaComponent(0.5)
         chevron.contentTintColor = textColor.withAlphaComponent(0.6)
-        refreshButton.contentTintColor = textColor.withAlphaComponent(0.6)
+        for button in [refreshButton, optionsButton, collapseAllButton, expandAllButton] {
+            button.contentTintColor = textColor.withAlphaComponent(0.6)
+        }
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -201,9 +229,17 @@ final class iTermAgentSessionsPanel: NSView {
         let midY = header.bounds.midY
         chevron.frame = NSRect(x: 10, y: midY - 5, width: 10, height: 10)
         refreshButton.frame = NSRect(x: width - 26, y: midY - 8, width: 16, height: 16)
+        optionsButton.frame = NSRect(x: refreshButton.frame.minX - 22, y: midY - 8, width: 16, height: 16)
+        // Group buttons are hidden while the list is hidden or has no groups.
+        let showGroupButtons = !collapsed && !groupKeys.isEmpty
+        collapseAllButton.isHidden = !showGroupButtons
+        expandAllButton.isHidden = !showGroupButtons
+        expandAllButton.frame = NSRect(x: optionsButton.frame.minX - 22, y: midY - 8, width: 16, height: 16)
+        collapseAllButton.frame = NSRect(x: expandAllButton.frame.minX - 22, y: midY - 8, width: 16, height: 16)
+        let countTrailingEdge = showGroupButtons ? collapseAllButton.frame.minX : optionsButton.frame.minX
         countLabel.sizeToFit()
         let countWidth = countLabel.frame.width
-        countLabel.frame = NSRect(x: refreshButton.frame.minX - 6 - countWidth,
+        countLabel.frame = NSRect(x: countTrailingEdge - 6 - countWidth,
                                   y: midY - countLabel.frame.height / 2,
                                   width: countWidth,
                                   height: countLabel.frame.height)
@@ -265,6 +301,7 @@ final class iTermAgentSessionsPanel: NSView {
         sessions = iTermAgentSessionStore.shared.sessions
         rebuildRows()
         updateCount()
+        updateEmptyLabel()
         needsLayout = true
     }
 
@@ -288,6 +325,59 @@ final class iTermAgentSessionsPanel: NSView {
 
     @objc private func reload(_ sender: Any?) {
         iTermAgentSessionStore.shared.refresh()
+    }
+
+    @objc private func showOptionsMenu(_ sender: Any?) {
+        let menu = NSMenu()
+        let current = iTermAgentSessionStore.shared.timeRange
+        for range in iTermAgentSessionStore.TimeRange.allCases {
+            let item = NSMenuItem(title: Self.menuTitle(for: range),
+                                  action: #selector(selectTimeRange(_:)),
+                                  keyEquivalent: "")
+            item.target = self
+            item.tag = range.rawValue
+            item.state = range == current ? .on : .off
+            menu.addItem(item)
+        }
+        // The panel is flipped, so maxY is the bottom edge of the button.
+        let anchor = convert(optionsButton.frame, from: header)
+        menu.popUp(positioning: nil,
+                   at: NSPoint(x: anchor.minX, y: anchor.maxY + 4),
+                   in: self)
+    }
+
+    @objc private func selectTimeRange(_ sender: NSMenuItem) {
+        guard let range = iTermAgentSessionStore.TimeRange(rawValue: sender.tag) else {
+            return
+        }
+        iTermAgentSessionStore.shared.timeRange = range
+    }
+
+    private static func menuTitle(for range: iTermAgentSessionStore.TimeRange) -> String {
+        switch range {
+        case .pastWeek:
+            return String(localized: "AgentSessions.Range.PastWeek",
+                          defaultValue: "Sessions from the Past 7 Days",
+                          comment: "Menu item that limits the Agent Sessions list to the past 7 days")
+        case .pastMonth:
+            return String(localized: "AgentSessions.Range.PastMonth",
+                          defaultValue: "Sessions from the Past 30 Days",
+                          comment: "Menu item that limits the Agent Sessions list to the past 30 days")
+        }
+    }
+
+    private func updateEmptyLabel() {
+        switch iTermAgentSessionStore.shared.timeRange {
+        case .pastWeek:
+            emptyLabel.stringValue = String(localized: "AgentSessions.EmptyPastWeek",
+                                            defaultValue: "No sessions in the last 7 days",
+                                            comment: "Shown when there are no Copilot or Claude Code sessions from the past 7 days")
+        case .pastMonth:
+            emptyLabel.stringValue = String(localized: "AgentSessions.Empty",
+                                            defaultValue: "No sessions in the last 30 days",
+                                            comment: "Shown when there are no recent Copilot or Claude Code sessions")
+        }
+        needsLayout = true
     }
 
     private func updateCount() {
@@ -373,10 +463,22 @@ final class iTermAgentSessionsPanel: NSView {
         rebuildRows()
     }
 
+    @objc private func collapseAllGroups(_ sender: Any?) {
+        collapsedProjects = collapsedProjects.union(groupKeys)
+        rebuildRows()
+    }
+
+    @objc private func expandAllGroups(_ sender: Any?) {
+        collapsedProjects = collapsedProjects.subtracting(groupKeys)
+        rebuildRows()
+    }
+
     private func rebuildRows() {
         let projects = currentProjects()
         projectsSignature = Self.signature(of: projects)
         let groups = iTermAgentSessionGroup.groups(for: sessions, projects: projects)
+        groupKeys = groups.map(\.key)
+        needsLayout = true
         let collapsed = collapsedProjects
         var result = [iTermAgentSessionsRow]()
         for group in groups {

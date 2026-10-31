@@ -87,8 +87,31 @@ final class iTermAgentSessionStore: NSObject {
     @objc static let shared = iTermAgentSessionStore()
     static let didUpdateNotification = Notification.Name("iTermAgentSessionStoreDidUpdate")
 
-    private static let maximumAge: TimeInterval = 30 * 24 * 60 * 60
+    enum TimeRange: Int, CaseIterable {
+        case pastWeek = 7
+        case pastMonth = 30
 
+        var maximumAge: TimeInterval {
+            return TimeInterval(rawValue) * 24 * 60 * 60
+        }
+    }
+
+    private static let timeRangeKey = "NoSyncAgentSessionsTimeRangeDays"
+
+    // How far back to look for sessions. Changing it rescans.
+    var timeRange: TimeRange {
+        get {
+            TimeRange(rawValue: iTermUserDefaults.userDefaults().integer(forKey: Self.timeRangeKey)) ?? .pastMonth
+        }
+        set {
+            it_assert(Thread.isMainThread)
+            guard newValue != timeRange else {
+                return
+            }
+            iTermUserDefaults.userDefaults().set(newValue.rawValue, forKey: Self.timeRangeKey)
+            refresh()
+        }
+    }
     private(set) var sessions: [iTermAgentSession] = []
     private let queue = DispatchQueue(label: "com.iterm2.agent-session-store", qos: .utility)
     private var scanInProgress = false
@@ -114,11 +137,12 @@ final class iTermAgentSessionStore: NSObject {
             return
         }
         scanInProgress = true
+        let maximumAge = timeRange.maximumAge
         queue.async { [weak self] in
             guard let self else {
                 return
             }
-            let result = self.scan()
+            let result = self.scan(maximumAge: maximumAge)
             DispatchQueue.main.async {
                 self.sessions = result
                 self.lastScan = Date()
@@ -132,8 +156,8 @@ final class iTermAgentSessionStore: NSObject {
         }
     }
 
-    private func scan() -> [iTermAgentSession] {
-        let cutoff = Date().addingTimeInterval(-Self.maximumAge)
+    private func scan(maximumAge: TimeInterval) -> [iTermAgentSession] {
+        let cutoff = Date().addingTimeInterval(-maximumAge)
         var seenPaths = Set<String>()
         var result = copilotSessions(after: cutoff, seenPaths: &seenPaths)
         result += claudeSessions(after: cutoff, seenPaths: &seenPaths)
